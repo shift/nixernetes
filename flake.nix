@@ -19,6 +19,8 @@
            complianceEnforcement = import ./src/lib/compliance-enforcement.nix { inherit lib; };
            complianceProfiles = import ./src/lib/compliance-profiles.nix { inherit lib; };
            policies = import ./src/lib/policies.nix { inherit lib; };
+           policyGeneration = import ./src/lib/policy-generation.nix { inherit lib; };
+           rbac = import ./src/lib/rbac.nix { inherit lib; };
            output = import ./src/lib/output.nix { inherit lib pkgs; };
            types = import ./src/lib/types.nix { inherit lib; };
            validation = import ./src/lib/validation.nix { inherit lib; };
@@ -58,6 +60,8 @@
              lib-generators = pkgs.writeText "lib-generators.nix" (builtins.readFile ./src/lib/generators.nix);
              lib-compliance-enforcement = pkgs.writeText "lib-compliance-enforcement.nix" (builtins.readFile ./src/lib/compliance-enforcement.nix);
              lib-compliance-profiles = pkgs.writeText "lib-compliance-profiles.nix" (builtins.readFile ./src/lib/compliance-profiles.nix);
+             lib-policy-generation = pkgs.writeText "lib-policy-generation.nix" (builtins.readFile ./src/lib/policy-generation.nix);
+             lib-rbac = pkgs.writeText "lib-rbac.nix" (builtins.readFile ./src/lib/rbac.nix);
 
            # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
@@ -140,6 +144,8 @@
              generators = builtins.readFile ./src/lib/generators.nix;
              complianceEnforcement = builtins.readFile ./src/lib/compliance-enforcement.nix;
              complianceProfiles = builtins.readFile ./src/lib/compliance-profiles.nix;
+             policyGeneration = builtins.readFile ./src/lib/policy-generation.nix;
+             rbac = builtins.readFile ./src/lib/rbac.nix;
              }
              ''
               echo "✓ All module files readable"
@@ -148,6 +154,8 @@
               echo "✓ Compliance enforcement module loaded"
               echo "✓ Compliance profiles module loaded"
               echo "✓ Policies module loaded"
+              echo "✓ Policy generation module loaded"
+              echo "✓ RBAC module loaded"
               echo "✓ Output module loaded"
               echo "✓ Types module loaded"
               echo "✓ Validation module loaded"
