@@ -21,6 +21,8 @@
            policies = import ./src/lib/policies.nix { inherit lib; };
            policyGeneration = import ./src/lib/policy-generation.nix { inherit lib; };
            rbac = import ./src/lib/rbac.nix { inherit lib; };
+           api = import ./src/lib/api.nix { inherit lib pkgs; };
+           manifest = import ./src/lib/manifest.nix { inherit lib pkgs; };
            output = import ./src/lib/output.nix { inherit lib pkgs; };
            types = import ./src/lib/types.nix { inherit lib; };
            validation = import ./src/lib/validation.nix { inherit lib; };
