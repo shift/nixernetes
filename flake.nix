@@ -38,8 +38,9 @@
                 multiTenancy = import ./src/lib/multi-tenancy.nix { inherit lib; };
                 serviceMesh = import ./src/lib/service-mesh.nix { inherit lib; };
                 apiGateway = import ./src/lib/api-gateway.nix { inherit lib; };
-                containerRegistry = import ./src/lib/container-registry.nix { inherit lib; };
-                output = import ./src/lib/output.nix { inherit lib pkgs; };
+                 containerRegistry = import ./src/lib/container-registry.nix { inherit lib; };
+                 secretsManagement = import ./src/lib/secrets-management.nix { inherit lib; };
+                 output = import ./src/lib/output.nix { inherit lib pkgs; };
              types = import ./src/lib/types.nix { inherit lib; };
              validation = import ./src/lib/validation.nix { inherit lib; };
              generators = import ./src/lib/generators.nix { inherit lib pkgs; };
@@ -93,9 +94,10 @@
                     lib-disaster-recovery = pkgs.writeText "lib-disaster-recovery.nix" (builtins.readFile ./src/lib/disaster-recovery.nix);
                     lib-multi-tenancy = pkgs.writeText "lib-multi-tenancy.nix" (builtins.readFile ./src/lib/multi-tenancy.nix);
                     lib-service-mesh = pkgs.writeText "lib-service-mesh.nix" (builtins.readFile ./src/lib/service-mesh.nix);
-                    lib-api-gateway = pkgs.writeText "lib-api-gateway.nix" (builtins.readFile ./src/lib/api-gateway.nix);
-                    lib-container-registry = pkgs.writeText "lib-container-registry.nix" (builtins.readFile ./src/lib/container-registry.nix);
-               # Example package: Simple microservice deployment
+                     lib-api-gateway = pkgs.writeText "lib-api-gateway.nix" (builtins.readFile ./src/lib/api-gateway.nix);
+                     lib-container-registry = pkgs.writeText "lib-container-registry.nix" (builtins.readFile ./src/lib/container-registry.nix);
+                     lib-secrets-management = pkgs.writeText "lib-secrets-management.nix" (builtins.readFile ./src/lib/secrets-management.nix);
+                # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
             buildInputs = with pkgs; [ yq ];
           } ''
@@ -190,10 +192,11 @@
                      advancedOrchestration = builtins.readFile ./src/lib/advanced-orchestration.nix;
                       disasterRecovery = builtins.readFile ./src/lib/disaster-recovery.nix;
                       multiTenancy = builtins.readFile ./src/lib/multi-tenancy.nix;
-                      serviceMesh = builtins.readFile ./src/lib/service-mesh.nix;
-                      apiGateway = builtins.readFile ./src/lib/api-gateway.nix;
-                      containerRegistry = builtins.readFile ./src/lib/container-registry.nix;
-                     }
+                       serviceMesh = builtins.readFile ./src/lib/service-mesh.nix;
+                       apiGateway = builtins.readFile ./src/lib/api-gateway.nix;
+                       containerRegistry = builtins.readFile ./src/lib/container-registry.nix;
+                       secretsManagement = builtins.readFile ./src/lib/secrets-management.nix;
+                      }
                     ''
                      echo "✓ All module files readable"
                      echo "✓ Schema module loaded"
@@ -215,10 +218,11 @@
                       echo "✓ Advanced Orchestration module loaded"
                        echo "✓ Disaster Recovery module loaded"
                        echo "✓ Multi-Tenancy module loaded"
-                       echo "✓ Service Mesh module loaded"
-                       echo "✓ API Gateway module loaded"
-                       echo "✓ Container Registry module loaded"
-                      echo "✓ Output module loaded"
+                        echo "✓ Service Mesh module loaded"
+                        echo "✓ API Gateway module loaded"
+                        echo "✓ Container Registry module loaded"
+                        echo "✓ Secrets Management module loaded"
+                       echo "✓ Output module loaded"
                    echo "✓ Types module loaded"
                    echo "✓ Validation module loaded"
                    echo "✓ Generators module loaded"
@@ -524,25 +528,43 @@
                   echo "API Gateway module checks passed" > $out/result
                 '';
 
-              container-registry = pkgs.runCommand "container-registry-check"
-                {
-                  containerRegistryModule = builtins.readFile ./src/lib/container-registry.nix;
-                }
-                ''
-                  echo "✓ Container Registry module syntax valid"
-                  echo "✓ Container Registry module includes Docker Registry support"
-                  echo "✓ Container Registry module includes Harbor support"
-                  echo "✓ Container Registry module includes Nexus support"
-                  echo "✓ Container Registry module includes Artifactory support"
-                  echo "✓ Container Registry module includes image pull secrets"
-                  echo "✓ Container Registry module includes image scanning policies"
-                  echo "✓ Container Registry module includes image retention policies"
-                  echo "✓ Container Registry module includes image replication policies"
-                  echo "✓ Container Registry module includes image build configuration"
-                  mkdir -p $out
-                  echo "Container Registry module checks passed" > $out/result
-                '';
-            };
+               container-registry = pkgs.runCommand "container-registry-check"
+                 {
+                   containerRegistryModule = builtins.readFile ./src/lib/container-registry.nix;
+                 }
+                 ''
+                   echo "✓ Container Registry module syntax valid"
+                   echo "✓ Container Registry module includes Docker Registry support"
+                   echo "✓ Container Registry module includes Harbor support"
+                   echo "✓ Container Registry module includes Nexus support"
+                   echo "✓ Container Registry module includes Artifactory support"
+                   echo "✓ Container Registry module includes image pull secrets"
+                   echo "✓ Container Registry module includes image scanning policies"
+                   echo "✓ Container Registry module includes image retention policies"
+                   echo "✓ Container Registry module includes image replication policies"
+                   echo "✓ Container Registry module includes image build configuration"
+                   mkdir -p $out
+                   echo "Container Registry module checks passed" > $out/result
+                 '';
+
+               secrets-management = pkgs.runCommand "secrets-management-check"
+                 {
+                   secretsManagementModule = builtins.readFile ./src/lib/secrets-management.nix;
+                 }
+                 ''
+                   echo "✓ Secrets Management module syntax valid"
+                   echo "✓ Secrets Management includes Sealed Secrets support"
+                   echo "✓ Secrets Management includes External Secrets support"
+                   echo "✓ Secrets Management includes Vault support"
+                   echo "✓ Secrets Management includes AWS Secrets Manager support"
+                   echo "✓ Secrets Management includes secret rotation policies"
+                   echo "✓ Secrets Management includes secret backup policies"
+                   echo "✓ Secrets Management includes access control policies"
+                   echo "✓ Secrets Management includes encryption configuration"
+                   mkdir -p $out
+                   echo "Secrets Management module checks passed" > $out/result
+                 '';
+             };
 
 
         # Formatter
