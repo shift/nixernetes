@@ -30,9 +30,10 @@ let
     securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
     performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
-    policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
-
-  # Helper to check if a resource has expected labels
+     policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
+     helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
+ 
+   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
     let
       actualLabels = resource.metadata.labels or {};
@@ -1474,21 +1475,254 @@ in
       expected = true;
     };
 
-    # Test 62: Policy Testing - Framework Information
-    testPolicyTestingFrameworkInfo = {
-      name = "policy testing framework information";
-      test =
-        let
-          framework = policyTesting.framework;
-        in
-          # Should provide framework metadata
-          (framework.name == "Nixernetes Policy Testing Framework") &&
-          (framework.version == "1.0.0") &&
-          (framework.features ? "validation-policy-testing") &&
-          (builtins.elem "ClusterPolicy" framework.supportedPolicyTypes) &&
-          (builtins.elem "unit" framework.testFrameworks);
-      expected = true;
-    };
+     # Test 62: Policy Testing - Framework Information
+     testPolicyTestingFrameworkInfo = {
+       name = "policy testing framework information";
+       test =
+         let
+           framework = policyTesting.framework;
+         in
+           # Should provide framework metadata
+           (framework.name == "Nixernetes Policy Testing Framework") &&
+           (framework.version == "1.0.0") &&
+           (framework.features ? "validation-policy-testing") &&
+           (builtins.elem "ClusterPolicy" framework.supportedPolicyTypes) &&
+           (builtins.elem "unit" framework.testFrameworks);
+       expected = true;
+     };
+
+     # Test 63: Helm Integration - Chart Metadata Builder
+     testHelmChartMetadata = {
+       name = "helm integration chart metadata";
+       test =
+         let
+           metadata = helmIntegration.mkChartMetadata "test-chart" {
+             description = "Test chart for validation";
+             version = "1.0.0";
+             appVersion = "1.0.0";
+             keywords = ["test" "validation"];
+             maintainers = [{
+               name = "Test Team";
+               email = "test@example.com";
+             }];
+           };
+         in
+           # Should create valid chart metadata
+           (metadata.name == "test-chart") &&
+           (metadata.version == "1.0.0") &&
+           (metadata.appVersion == "1.0.0") &&
+           (metadata.type == "application") &&
+           (metadata.description == "Test chart for validation") &&
+           (builtins.length metadata.keywords == 2) &&
+           (metadata.kubeVersion == ">=1.28.0");
+       expected = true;
+     };
+
+     # Test 64: Helm Integration - Chart Values Builder
+     testHelmChartValues = {
+       name = "helm integration chart values";
+       test =
+         let
+           values = helmIntegration.mkChartValues "test-app" {
+             replicaCount = 3;
+             image = {
+               repository = "myregistry.azurecr.io/test-app";
+               tag = "1.0.0";
+               pullPolicy = "Always";
+             };
+             service = {
+               type = "LoadBalancer";
+               port = 443;
+               targetPort = 8443;
+             };
+             resources = {
+               limits = {
+                 cpu = "1000m";
+                 memory = "1Gi";
+               };
+               requests = {
+                 cpu = "500m";
+                 memory = "512Mi";
+               };
+             };
+           };
+         in
+           # Should create valid values structure
+           (values.replicaCount == 3) &&
+           (values.image.repository == "myregistry.azurecr.io/test-app") &&
+           (values.image.tag == "1.0.0") &&
+           (values.image.pullPolicy == "Always") &&
+           (values.service.type == "LoadBalancer") &&
+           (values.service.port == 443) &&
+           (values.resources.limits.cpu == "1000m") &&
+           (values.resources.requests.memory == "512Mi") &&
+           (values.autoscaling.enabled == false);
+       expected = true;
+     };
+
+     # Test 65: Helm Integration - Helm Chart Builder
+     testHelmChartBuilder = {
+       name = "helm integration chart builder";
+       test =
+         let
+           chart = helmIntegration.mkHelmChart "complete-app" {
+             description = "Complete application chart";
+             version = "2.0.0";
+             appVersion = "2.0.0";
+             image = {
+               repository = "nginx";
+               tag = "1.24-alpine";
+             };
+             service = {
+               type = "ClusterIP";
+               port = 80;
+               targetPort = 8080;
+             };
+             replicaCount = 2;
+           };
+         in
+           # Should create valid helm chart
+           (chart.name == "complete-app") &&
+           (chart.metadata.version == "2.0.0") &&
+           (chart.metadata.appVersion == "2.0.0") &&
+           (chart.manifest.apiVersion == "v2") &&
+           (chart.values.replicaCount == 2) &&
+           (chart.values.image.repository == "nginx") &&
+           (chart.values.service.port == 80) &&
+           (chart.chartPath == "charts/complete-app");
+       expected = true;
+     };
+
+     # Test 66: Helm Integration - Chart Validation
+     testHelmChartValidation = {
+       name = "helm integration chart validation";
+       test =
+         let
+           validChart = helmIntegration.mkHelmChart "valid-app" {
+             description = "Valid chart";
+             version = "1.5.3";
+             image = { repository = "app"; tag = "1.0"; };
+           };
+           validationResult = helmIntegration.validateChart validChart;
+           
+           invalidChart = helmIntegration.mkHelmChart "invalid-app" {
+             description = "";
+             version = "invalid-version";
+             image = { repository = "app"; tag = "1.0"; };
+           };
+           invalidationResult = helmIntegration.validateChart invalidChart;
+         in
+           # Should validate charts correctly
+           (validationResult.valid == true) &&
+           (builtins.length validationResult.errors == 0) &&
+           (invalidationResult.valid == false) &&
+           (builtins.length invalidationResult.errors > 0);
+       expected = true;
+     };
+
+     # Test 67: Helm Integration - Chart Dependency Builder
+     testHelmChartDependency = {
+       name = "helm integration chart dependency";
+       test =
+         let
+           dep = helmIntegration.mkChartDependency "postgresql" {
+             version = "13.0.0";
+             repository = "oci://registry.example.com/charts";
+             condition = "postgresql.enabled";
+             tags = ["database"];
+           };
+         in
+           # Should create valid dependency
+           (dep.name == "postgresql") &&
+           (dep.version == "13.0.0") &&
+           (dep.repository == "oci://registry.example.com/charts") &&
+           (dep.condition == "postgresql.enabled") &&
+           (builtins.elem "database" dep.tags);
+       expected = true;
+     };
+
+     # Test 68: Helm Integration - Application to Chart Conversion
+     testHelmApplicationConversion = {
+       name = "helm integration application conversion";
+       test =
+         let
+           app = {
+             name = "my-app";
+             image = "myregistry.azurecr.io/my-app:2.0.0";
+             replicas = 3;
+             port = 3000;
+             imagePullPolicy = "IfNotPresent";
+             annotations = {
+               "prometheus.io/scrape" = "true";
+             };
+             securityContext = {
+               runAsNonRoot = true;
+             };
+             env = {
+               ENV = "production";
+               DEBUG = "false";
+             };
+             resources = {
+               limits = { cpu = "500m"; };
+               requests = { memory = "256Mi"; };
+             };
+           };
+           chartValues = helmIntegration.applicationToChartValues app;
+         in
+           # Should convert application to chart values
+           (chartValues.replicaCount == 3) &&
+           (chartValues.image.repository == "myregistry.azurecr.io/my-app") &&
+           (chartValues.image.tag == "2.0.0") &&
+           (chartValues.service.port == 3000) &&
+           (chartValues.podAnnotations ? "prometheus.io/scrape") &&
+           (builtins.length chartValues.env > 0);
+       expected = true;
+     };
+
+     # Test 69: Helm Integration - Chart Packaging
+     testHelmChartPackaging = {
+       name = "helm integration chart packaging";
+       test =
+         let
+           chart = helmIntegration.mkHelmChart "packaged-app" {
+             description = "App for packaging";
+             version = "1.0.0";
+             image = { repository = "app"; tag = "1.0"; };
+           };
+           package = helmIntegration.mkChartPackage chart;
+         in
+           # Should create valid chart package
+           (package.name == "packaged-app") &&
+           (package.structure ? "Chart.yaml") &&
+           (package.structure ? "values.yaml") &&
+           (package.structure ? "templates/deployment.yaml") &&
+           (package.structure ? "templates/service.yaml") &&
+           (package.structure ? "templates/_helpers.tpl") &&
+           (package.structure ? "README.md") &&
+           (builtins.match ".*packaged-app.*tgz" package.publishPath != null);
+       expected = true;
+     };
+
+     # Test 70: Helm Integration - Framework Information
+     testHelmIntegrationFrameworkInfo = {
+       name = "helm integration framework information";
+       test =
+         let
+           framework = helmIntegration.framework;
+         in
+           # Should provide framework metadata
+           (framework.name == "Nixernetes Helm Integration") &&
+           (framework.version == "1.0.0") &&
+           (framework.features ? "chart-generation") &&
+           (framework.features ? "values-generation") &&
+           (framework.features ? "chart-validation") &&
+           (framework.features ? "dependency-management") &&
+           (framework.features ? "unified-api-integration") &&
+           (builtins.elem "3.10+" framework.supportedHelmVersions) &&
+           (builtins.elem "1.28" framework.supportedKubernetesVersions);
+       expected = true;
+     };
+
 }
 
 
