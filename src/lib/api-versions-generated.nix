@@ -107,6 +107,30 @@ let
       StatefulSet = "apps/v1";
     };
 
+    "1.32" = {
+      ClusterRole = "rbac.authorization.k8s.io/v1";
+      ClusterRoleBinding = "rbac.authorization.k8s.io/v1";
+      ConfigMap = "v1";
+      CronJob = "batch/v1";
+      DaemonSet = "apps/v1";
+      Deployment = "apps/v1";
+      Ingress = "networking.k8s.io/v1";
+      IngressClass = "networking.k8s.io/v1";
+      Job = "batch/v1";
+      Namespace = "v1";
+      NetworkPolicy = "networking.k8s.io/v1";
+      PersistentVolume = "v1";
+      PersistentVolumeClaim = "v1";
+      Pod = "v1";
+      ReplicaSet = "apps/v1";
+      Role = "rbac.authorization.k8s.io/v1";
+      RoleBinding = "rbac.authorization.k8s.io/v1";
+      Secret = "v1";
+      Service = "v1";
+      ServiceAccount = "v1";
+      StatefulSet = "apps/v1";
+    };
+
   };
 
   supportedVersions = builtins.attrNames apiVersionMatrix;
