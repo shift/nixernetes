@@ -28,6 +28,7 @@ let
    gitops = import ../src/lib/gitops.nix { inherit lib; };
    policyVisualization = import ../src/lib/policy-visualization.nix { inherit lib; };
    securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
+   performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -988,6 +989,142 @@ in
          (report.findings ? CRITICAL || report.findings ? HIGH) &&
          (report ? recommendations) &&
          (report ? remediationPlan);
+     expected = true;
+   };
+
+   # Test 40: Performance Analysis - Resource Profiling
+   testPerformanceAnalysisProfile = {
+     name = "performance analysis resource profiling";
+     test =
+       let
+         workloads = [
+           {
+             name = "web-app";
+             namespace = "production";
+             type = "pod";
+             containers = 2;
+             cpu = { requested = "100m"; limit = "500m"; };
+             memory = { requested = "128Mi"; limit = "512Mi"; };
+           }
+           {
+             name = "api-server";
+             namespace = "production";
+             type = "pod";
+             containers = 3;
+             cpu = { requested = "200m"; limit = "1000m"; };
+             memory = { requested = "256Mi"; limit = "1Gi"; };
+           }
+         ];
+         profile = performanceAnalysis.profileResources { inherit workloads; };
+       in
+         # Should create valid resource profile
+         (profile.type == "resource-profile") &&
+         (builtins.length profile.workloads == 2) &&
+         (profile.aggregated ? totalWorkloads) &&
+         (profile ? byNamespace) &&
+         (profile ? utilizationAnalysis);
+     expected = true;
+   };
+
+   # Test 41: Performance Analysis - Bottleneck Detection
+   testPerformanceAnalysisBottlenecks = {
+     name = "performance analysis bottleneck detection";
+     test =
+       let
+         metrics = { cpu = 85; memory = 70; disk = 60; network = 40; };
+         bottlenecks = performanceAnalysis.detectBottlenecks { inherit metrics; };
+       in
+         # Should detect bottlenecks
+         (bottlenecks.type == "bottleneck-detection") &&
+         (builtins.length bottlenecks.bottlenecks > 0) &&
+         (bottlenecks ? bySeverity) &&
+         (bottlenecks ? rootCauseAnalysis) &&
+         (bottlenecks.healthStatus != null);
+     expected = true;
+   };
+
+   # Test 42: Performance Analysis - Optimization Recommendations
+   testPerformanceAnalysisRecommendations = {
+     name = "performance analysis optimization recommendations";
+     test =
+       let
+         profile = {
+           type = "resource-profile";
+           workloads = [
+             { name = "app-1"; cpu = 50; memory = 45; }
+           ];
+           utilizationAnalysis = { cpu = { average = 40; }; };
+         };
+         bottlenecks = {
+           type = "bottleneck-detection";
+           statistics = { criticalComponents = 0; };
+         };
+         recommendations = performanceAnalysis.recommendOptimizations { inherit profile bottlenecks; };
+       in
+         # Should generate recommendations
+         (recommendations.type == "optimization-recommendations") &&
+         (recommendations ? recommendations) &&
+         (recommendations ? byCategory) &&
+         (recommendations.impactAnalysis ? estimatedCostSavings) &&
+         (recommendations ? prioritizedRecommendations);
+     expected = true;
+   };
+
+   # Test 43: Performance Analysis - Comparison
+   testPerformanceAnalysisComparison = {
+     name = "performance analysis comparison";
+     test =
+       let
+         baseline = { cpu = 50; memory = 45; latency = 100; };
+         current = { cpu = 55; memory = 48; latency = 110; };
+         comparison = performanceAnalysis.comparePerformance { inherit baseline current; };
+       in
+         # Should create valid comparison
+         (comparison.type == "performance-comparison") &&
+         (comparison.comparisons ? cpu) &&
+         (comparison.comparisons ? memory) &&
+         (comparison.comparisons ? latency) &&
+         (comparison ? verdict);
+     expected = true;
+   };
+
+   # Test 44: Performance Analysis - Trends
+   testPerformanceAnalysisTrends = {
+     name = "performance analysis trends";
+     test =
+       let
+         measurements = {
+           cpu = [ 50 51 49 52 50 ];
+           memory = [ 45 46 44 47 45 ];
+           latency = [ 100 102 98 105 101 ];
+         };
+         trends = performanceAnalysis.analyzeTrends { inherit measurements; };
+       in
+         # Should analyze trends
+         (trends.type == "performance-trends") &&
+         (trends.trends ? cpu) &&
+         (trends.trends ? memory) &&
+         (trends.trends ? latency) &&
+         (trends ? forecast);
+     expected = true;
+   };
+
+   # Test 45: Performance Analysis - Report Generation
+   testPerformanceAnalysisReport = {
+     name = "performance analysis report generation";
+     test =
+       let
+         profile = { utilizationAnalysis = { cpu = { average = 50; }; }; statistics = { profiledWorkloads = 5; }; };
+         bottlenecks = { statistics = { criticalComponents = 0; }; bottlenecks = []; };
+         recommendations = { statistics = { totalRecommendations = 3; }; recommendations = []; };
+         report = performanceAnalysis.generatePerformanceReport { inherit profile bottlenecks recommendations; };
+       in
+         # Should generate performance report
+         (report.type == "performance-report") &&
+         (report.summary ? overallHealth) &&
+         (report ? metrics) &&
+         (report ? findings) &&
+         (report ? actionPlan);
      expected = true;
    };
 }
