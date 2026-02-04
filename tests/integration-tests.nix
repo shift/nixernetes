@@ -36,6 +36,7 @@ let
         disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
         multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
         serviceMesh = import ../src/lib/service-mesh.nix { inherit lib; };
+        apiGateway = import ../src/lib/api-gateway.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -2624,6 +2625,244 @@ in
             (builtins.elem "istio" framework.supportedMeshes) &&
             (builtins.elem "linkerd" framework.supportedMeshes) &&
             (builtins.elem "jaeger" framework.supportedTracingProviders);
+        expected = true;
+      };
+
+      # Test 103: API Gateway - Traefik Configuration
+      testApiGatewayTraefik = {
+        name = "api gateway traefik configuration";
+        test =
+          let
+            gateway = apiGateway.mkTraefik "production" {
+              namespace = "ingress";
+              replicas = 3;
+              version = "2.10";
+              tls = {
+                enabled = true;
+                certResolver = "letsencrypt";
+              };
+            };
+          in
+            # Should create valid Traefik config
+            (gateway.baseName == "production") &&
+            (gateway.framework == "traefik") &&
+            (gateway.version == "2.10") &&
+            (gateway.namespace == "ingress") &&
+            (gateway.replicas == 3) &&
+            (gateway.api.enabled == true) &&
+            (gateway.api.dashboard == true) &&
+            (gateway.tls.enabled == true) &&
+            (gateway.tls.certResolver == "letsencrypt") &&
+            (gateway.labels.framework == "traefik");
+        expected = true;
+      };
+
+      # Test 104: API Gateway - Kong Configuration
+      testApiGatewayKong = {
+        name = "api gateway kong configuration";
+        test =
+          let
+            gateway = apiGateway.mkKong "enterprise" {
+              namespace = "kong-prod";
+              replicas = 5;
+              version = "3.4";
+              database = {
+                host = "kong-db.postgres.svc";
+                port = 5432;
+                name = "kong-enterprise";
+              };
+              authentication = {
+                oauth2Enabled = true;
+              };
+              rateLimiting = {
+                enabled = true;
+                defaultLimit = 1000;
+              };
+            };
+          in
+            # Should create valid Kong config
+            (gateway.baseName == "enterprise") &&
+            (gateway.framework == "kong") &&
+            (gateway.version == "3.4") &&
+            (gateway.namespace == "kong-prod") &&
+            (gateway.replicas == 5) &&
+            (gateway.database.host == "kong-db.postgres.svc") &&
+            (gateway.database.port == 5432) &&
+            (gateway.database.name == "kong-enterprise") &&
+            (gateway.admin.enabled == true) &&
+            (gateway.authentication.oauth2Enabled == true) &&
+            (gateway.rateLimiting.enabled == true) &&
+            (gateway.rateLimiting.defaultLimit == 1000);
+        expected = true;
+      };
+
+      # Test 105: API Gateway - Contour Configuration
+      testApiGatewayContour = {
+        name = "api gateway contour configuration";
+        test =
+          let
+            gateway = apiGateway.mkContour "edge" {
+              namespace = "projectcontour";
+              replicas = 2;
+              version = "1.28";
+              envoy = {
+                replicas = 3;
+              };
+              loadBalancing = {
+                strategy = "LeastRequest";
+              };
+            };
+          in
+            # Should create valid Contour config
+            (gateway.baseName == "edge") &&
+            (gateway.framework == "contour") &&
+            (gateway.version == "1.28") &&
+            (gateway.namespace == "projectcontour") &&
+            (gateway.replicas == 2) &&
+            (gateway.envoy.replicas == 3) &&
+            (gateway.tls.enabled == true) &&
+            (gateway.tls.minimumProtocolVersion == "1.2") &&
+            (gateway.loadBalancing.strategy == "LeastRequest") &&
+            (gateway.metrics.enabled == true);
+        expected = true;
+      };
+
+      # Test 106: API Gateway - NGINX Configuration
+      testApiGatewayNginx = {
+        name = "api gateway nginx configuration";
+        test =
+          let
+            gateway = apiGateway.mkNginx "secure" {
+              namespace = "ingress-nginx";
+              replicas = 3;
+              version = "1.9";
+              modsecurity = {
+                enabled = true;
+                securityRulesSet = "owasp";
+              };
+              https = {
+                enabled = true;
+              };
+            };
+          in
+            # Should create valid NGINX config
+            (gateway.baseName == "secure") &&
+            (gateway.framework == "nginx") &&
+            (gateway.version == "1.9") &&
+            (gateway.namespace == "ingress-nginx") &&
+            (gateway.replicas == 3) &&
+            (gateway.ingressClass.name == "nginx") &&
+            (gateway.ingressClass.isDefault == true) &&
+            (gateway.modsecurity.enabled == true) &&
+            (gateway.modsecurity.securityRulesSet == "owasp") &&
+            (gateway.https.enabled == true) &&
+            (gateway.rateLimiting.enabled == true);
+        expected = true;
+      };
+
+      # Test 107: API Gateway - Rate Limiting Policy
+      testApiGatewayRateLimiting = {
+        name = "api gateway rate limiting policy";
+        test =
+          let
+            policy = apiGateway.mkRateLimitPolicy "api-limit" {
+              limits = {
+                requests = 100;
+                window = "1m";
+                burst = 20;
+              };
+              keyExtractor = {
+                type = "clientIP";
+              };
+            };
+          in
+            # Should create valid rate limit policy
+            (policy.baseName == "api-limit") &&
+            (policy.policyType == "rateLimit") &&
+            (policy.limits.requests == 100) &&
+            (policy.limits.window == "1m") &&
+            (policy.limits.burst == 20) &&
+            (policy.keyExtractor.type == "clientIP") &&
+            (policy.actions.type == "reject") &&
+            (policy.actions.statusCode == 429);
+        expected = true;
+      };
+
+      # Test 108: API Gateway - Circuit Breaker Policy
+      testApiGatewayCircuitBreaker = {
+        name = "api gateway circuit breaker policy";
+        test =
+          let
+            policy = apiGateway.mkCircuitBreaker "fault-tolerance" {
+              consecutiveErrors = 5;
+              errorPercentageThreshold = 50;
+              detectionWindow = "30s";
+              recoveryTimeout = "60s";
+            };
+          in
+            # Should create valid circuit breaker policy
+            (policy.baseName == "fault-tolerance") &&
+            (policy.policyType == "circuitBreaker") &&
+            (policy.consecutiveErrors == 5) &&
+            (policy.errorPercentageThreshold == 50) &&
+            (policy.detectionWindow == "30s") &&
+            (policy.recoveryTimeout == "60s") &&
+            (policy.actions.type == "reject") &&
+            (policy.actions.statusCode == 503);
+        expected = true;
+      };
+
+      # Test 109: API Gateway - Authentication Policy
+      testApiGatewayAuthentication = {
+        name = "api gateway authentication policy";
+        test =
+          let
+            policy = apiGateway.mkAuthPolicy "oauth-auth" {
+              methods = {
+                oauth2 = true;
+                jwt = false;
+              };
+              oauth2 = {
+                enabled = true;
+                clientId = "client-id";
+                clientSecret = "client-secret";
+                discoveryUrl = "https://auth.example.com/.well-known";
+              };
+            };
+          in
+            # Should create valid auth policy
+            (policy.baseName == "oauth-auth") &&
+            (policy.policyType == "authentication") &&
+            (policy.methods.oauth2 == true) &&
+            (policy.methods.jwt == false) &&
+            (policy.oauth2.enabled == true) &&
+            (policy.oauth2.clientId == "client-id") &&
+            (policy.oauth2.clientSecret == "client-secret");
+        expected = true;
+      };
+
+      # Test 110: API Gateway - Framework Information
+      testApiGatewayFrameworkInfo = {
+        name = "api gateway framework information";
+        test =
+          let
+            framework = apiGateway.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "api-gateway") &&
+            (framework.version == "1.0.0") &&
+            (framework.features ? "traefik") &&
+            (framework.features ? "kong") &&
+            (framework.features ? "contour") &&
+            (framework.features ? "nginx") &&
+            (framework.features ? "gateway") &&
+            (framework.features ? "rateLimiting") &&
+            (framework.features ? "circuitBreaker") &&
+            (framework.features ? "loadBalancing") &&
+            (framework.features ? "authentication") &&
+            (builtins.elem "1.26" framework.supportedK8sVersions) &&
+            (builtins.elem "1.31" framework.supportedK8sVersions) &&
+            (framework.maturity == "stable");
         expected = true;
       };
 
