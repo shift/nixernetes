@@ -31,10 +31,11 @@ let
     performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
       policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
-       helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
-       advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
-       disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
-       multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
+        helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
+        advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
+        disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
+        multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
+        serviceMesh = import ../src/lib/service-mesh.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -2412,6 +2413,217 @@ in
             (framework.features ? "audit") &&
             (builtins.elem "strict" framework.supportedIsolationLevels) &&
             (builtins.elem "monthly" framework.supportedBillingCycles);
+        expected = true;
+      };
+
+      # Test 95: Service Mesh - Istio Configuration
+      testServiceMeshIstio = {
+        name = "service mesh istio configuration";
+        test =
+          let
+            mesh = serviceMesh.mkIstioMesh "production" {
+              namespace = "istio-system";
+              version = "1.17.0";
+              installMode = "demo";
+              enableIngressGateway = true;
+              enableEgressGateway = true;
+              enableMtls = true;
+              mtlsMode = "STRICT";
+              enableAuthorizationPolicy = true;
+              enableTracing = true;
+              tracingProvider = "jaeger";
+              enableKiali = true;
+            };
+          in
+            # Should create valid Istio mesh
+            (mesh.name == "production") &&
+            (mesh.namespace == "istio-system") &&
+            (mesh.version == "1.17.0") &&
+            (mesh.installMode == "demo") &&
+            (mesh.enableIngressGateway == true) &&
+            (mesh.enableEgressGateway == true) &&
+            (mesh.mtlsMode == "STRICT") &&
+            (mesh.enableAuthorizationPolicy == true) &&
+            (mesh.enableKiali == true);
+        expected = true;
+      };
+
+      # Test 96: Service Mesh - Linkerd Configuration
+      testServiceMeshLinkerd = {
+        name = "service mesh linkerd configuration";
+        test =
+          let
+            mesh = serviceMesh.mkLinkerdMesh "production" {
+              namespace = "linkerd";
+              version = "2.14.0";
+              installMode = "stable";
+              enableControlPlane = true;
+              enableDataPlane = true;
+              enableViz = true;
+              enableMtls = true;
+              mtlsRotationDays = 365;
+              enableHA = true;
+              replicas = 3;
+              enableAutoInject = true;
+            };
+          in
+            # Should create valid Linkerd mesh
+            (mesh.name == "production") &&
+            (mesh.namespace == "linkerd") &&
+            (mesh.version == "2.14.0") &&
+            (mesh.installMode == "stable") &&
+            (mesh.enableControlPlane == true) &&
+            (mesh.enableDataPlane == true) &&
+            (mesh.enableViz == true) &&
+            (mesh.enableMtls == true) &&
+            (mesh.enableHA == true) &&
+            (mesh.replicas == 3);
+        expected = true;
+      };
+
+      # Test 97: Service Mesh - Virtual Service
+      testServiceMeshVirtualService = {
+        name = "service mesh virtual service";
+        test =
+          let
+            vs = serviceMesh.mkVirtualService "web-service" {
+              namespace = "production";
+              hosts = ["web" "web.svc.cluster.local"];
+              timeout = "30s";
+              httpRoutes = [];
+            };
+          in
+            # Should create valid virtual service
+            (vs.name == "web-service") &&
+            (vs.namespace == "production") &&
+            (builtins.length vs.hosts == 2) &&
+            (vs.timeout == "30s");
+        expected = true;
+      };
+
+      # Test 98: Service Mesh - Destination Rule
+      testServiceMeshDestinationRule = {
+        name = "service mesh destination rule";
+        test =
+          let
+            dr = serviceMesh.mkDestinationRule "web-service" {
+              namespace = "production";
+              host = "web-service";
+              
+              subsets = [
+                { name = "v1"; labels = { version = "v1"; }; }
+                { name = "v2"; labels = { version = "v2"; }; }
+              ];
+            };
+          in
+            # Should create valid destination rule
+            (dr.name == "web-service") &&
+            (dr.namespace == "production") &&
+            (dr.host == "web-service") &&
+            (builtins.length dr.subsets == 2);
+        expected = true;
+      };
+
+      # Test 99: Service Mesh - Traffic Policy
+      testServiceMeshTrafficPolicy = {
+        name = "service mesh traffic policy";
+        test =
+          let
+            policy = serviceMesh.mkTrafficPolicy "resilient" {
+              circuitBreaker = {
+                enabled = true;
+                consecutiveErrors = 5;
+                interval = "30s";
+              };
+              retries = {
+                enabled = true;
+                attempts = 3;
+                perTryTimeout = "10s";
+              };
+              timeout = "30s";
+              loadBalancer = "ROUND_ROBIN";
+            };
+          in
+            # Should create valid traffic policy
+            (policy.name == "resilient") &&
+            (policy.circuitBreaker.enabled == true) &&
+            (policy.circuitBreaker.consecutiveErrors == 5) &&
+            (policy.retries.enabled == true) &&
+            (policy.retries.attempts == 3) &&
+            (policy.timeout == "30s") &&
+            (policy.loadBalancer == "ROUND_ROBIN");
+        expected = true;
+      };
+
+      # Test 100: Service Mesh - Authorization Policy
+      testServiceMeshAuthorizationPolicy = {
+        name = "service mesh authorization policy";
+        test =
+          let
+            policy = serviceMesh.mkAuthorizationPolicy "allow-traffic" {
+              namespace = "production";
+              action = "ALLOW";
+              selector = { "app" = "web"; };
+              rules = [];
+            };
+          in
+            # Should create valid authorization policy
+            (policy.name == "allow-traffic") &&
+            (policy.namespace == "production") &&
+            (policy.action == "ALLOW") &&
+            (policy.selector ? "app");
+        expected = true;
+      };
+
+      # Test 101: Service Mesh - Observability Config
+      testServiceMeshObservabilityConfig = {
+        name = "service mesh observability configuration";
+        test =
+          let
+            obs = serviceMesh.mkObservabilityConfig "production" {
+              metricsEnabled = true;
+              metricsPort = 15000;
+              tracingEnabled = true;
+              tracingProvider = "jaeger";
+              tracingSamplingRate = 0.05;
+              accessLogEnabled = true;
+              dashboardEnabled = true;
+              dashboardProvider = "kiali";
+            };
+          in
+            # Should create valid observability config
+            (obs.name == "production") &&
+            (obs.metricsEnabled == true) &&
+            (obs.metricsPort == 15000) &&
+            (obs.tracingEnabled == true) &&
+            (obs.tracingProvider == "jaeger") &&
+            (obs.tracingSamplingRate == 0.05) &&
+            (obs.accessLogEnabled == true) &&
+            (obs.dashboardEnabled == true) &&
+            (obs.dashboardProvider == "kiali");
+        expected = true;
+      };
+
+      # Test 102: Service Mesh - Framework Information
+      testServiceMeshFrameworkInfo = {
+        name = "service mesh framework information";
+        test =
+          let
+            framework = serviceMesh.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "Nixernetes Service Mesh Integration") &&
+            (framework.version == "1.0.0") &&
+            (framework.features ? "istio-support") &&
+            (framework.features ? "linkerd-support") &&
+            (framework.features ? "virtual-services") &&
+            (framework.features ? "destination-rules") &&
+            (framework.features ? "traffic-policies") &&
+            (framework.features ? "authorization-policies") &&
+            (framework.features ? "observability") &&
+            (builtins.elem "istio" framework.supportedMeshes) &&
+            (builtins.elem "linkerd" framework.supportedMeshes) &&
+            (builtins.elem "jaeger" framework.supportedTracingProviders);
         expected = true;
       };
 
