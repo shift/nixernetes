@@ -37,6 +37,7 @@ let
         multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
         serviceMesh = import ../src/lib/service-mesh.nix { inherit lib; };
         apiGateway = import ../src/lib/api-gateway.nix { inherit lib; };
+        containerRegistry = import ../src/lib/container-registry.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -2860,6 +2861,225 @@ in
             (framework.features ? "circuitBreaker") &&
             (framework.features ? "loadBalancing") &&
             (framework.features ? "authentication") &&
+            (builtins.elem "1.26" framework.supportedK8sVersions) &&
+            (builtins.elem "1.31" framework.supportedK8sVersions) &&
+            (framework.maturity == "stable");
+        expected = true;
+      };
+
+      # Test 111: Container Registry - Docker Registry Configuration
+      testContainerRegistryDocker = {
+        name = "container registry docker configuration";
+        test =
+          let
+            registry = containerRegistry.mkDockerRegistry "local" {
+              namespace = "registry";
+              replicas = 2;
+              storage.driver = "s3";
+              storage.s3 = {
+                enabled = true;
+                bucket = "my-registry";
+              };
+            };
+          in
+            # Should create valid Docker Registry config
+            (registry.baseName == "local") &&
+            (registry.framework == "docker-registry") &&
+            (registry.version == "2.8") &&
+            (registry.namespace == "registry") &&
+            (registry.replicas == 2) &&
+            (registry.storage.driver == "s3") &&
+            (registry.storage.s3.enabled == true) &&
+            (registry.storage.s3.bucket == "my-registry") &&
+            (registry.http.addr == ":5000") &&
+            (registry.auth.enabled == true) &&
+            (registry.labels.framework == "docker-registry");
+        expected = true;
+      };
+
+      # Test 112: Container Registry - Harbor Configuration
+      testContainerRegistryHarbor = {
+        name = "container registry harbor configuration";
+        test =
+          let
+            registry = containerRegistry.mkHarborRegistry "production" {
+              namespace = "harbor";
+              coreReplicas = 3;
+              registryReplicas = 3;
+              database = {
+                host = "postgres.harbor.svc";
+                port = 5432;
+              };
+              trivy.enabled = true;
+            };
+          in
+            # Should create valid Harbor config
+            (registry.baseName == "production") &&
+            (registry.framework == "harbor") &&
+            (registry.version == "2.10") &&
+            (registry.namespace == "harbor") &&
+            (registry.coreReplicas == 3) &&
+            (registry.registryReplicas == 3) &&
+            (registry.database.host == "postgres.harbor.svc") &&
+            (registry.database.port == 5432) &&
+            (registry.database.type == "postgresql") &&
+            (registry.trivy.enabled == true) &&
+            (registry.replication.enabled == true) &&
+            (registry.garbageCollection.enabled == true);
+        expected = true;
+      };
+
+      # Test 113: Container Registry - Nexus Configuration
+      testContainerRegistryNexus = {
+        name = "container registry nexus configuration";
+        test =
+          let
+            registry = containerRegistry.mkNexusRegistry "enterprise" {
+              namespace = "nexus";
+              replicas = 2;
+              jvm = {
+                maxMemory = "2048m";
+                minMemory = "512m";
+              };
+            };
+          in
+            # Should create valid Nexus config
+            (registry.baseName == "enterprise") &&
+            (registry.framework == "nexus") &&
+            (registry.version == "3.68") &&
+            (registry.namespace == "nexus") &&
+            (registry.replicas == 2) &&
+            (registry.repositories.docker.hosted == true) &&
+            (registry.repositories.maven.proxy == true) &&
+            (registry.repositories.npm.group == true) &&
+            (registry.jvm.maxMemory == "2048m") &&
+            (registry.jvm.minMemory == "512m");
+        expected = true;
+      };
+
+      # Test 114: Container Registry - Artifactory Configuration
+      testContainerRegistryArtifactory = {
+        name = "container registry artifactory configuration";
+        test =
+          let
+            registry = containerRegistry.mkArtifactoryRegistry "enterprise" {
+              namespace = "artifactory";
+              replicas = 2;
+              database.type = "postgresql";
+            };
+          in
+            # Should create valid Artifactory config
+            (registry.baseName == "enterprise") &&
+            (registry.framework == "artifactory") &&
+            (registry.version == "7.84") &&
+            (registry.namespace == "artifactory") &&
+            (registry.replicas == 2) &&
+            (registry.database.type == "postgresql") &&
+            (registry.repositories.docker.local == true) &&
+            (registry.repositories.maven.remote == true) &&
+            (registry.authentication.enabled == true) &&
+            (registry.security.ssl.enabled == true) &&
+            (registry.security.encryption.enabled == true);
+        expected = true;
+      };
+
+      # Test 115: Container Registry - Image Scanning Policy
+      testContainerRegistryImageScan = {
+        name = "container registry image scanning policy";
+        test =
+          let
+            policy = containerRegistry.mkImageScanPolicy "vulnerability-scan" {
+              scanning = {
+                enabled = true;
+                scanner = "trivy";
+                onPull = true;
+                onPush = true;
+              };
+              vulnerabilities.critical.action = "block";
+            };
+          in
+            # Should create valid scanning policy
+            (policy.baseName == "vulnerability-scan") &&
+            (policy.policyType == "image-scan") &&
+            (policy.scanning.enabled == true) &&
+            (policy.scanning.scanner == "trivy") &&
+            (policy.scanning.onPull == true) &&
+            (policy.scanning.onPush == true) &&
+            (policy.vulnerabilities.critical.action == "block") &&
+            (policy.vulnerabilities.high.action == "warn") &&
+            (policy.vulnerabilities.medium.action == "allow");
+        expected = true;
+      };
+
+      # Test 116: Container Registry - Image Retention Policy
+      testContainerRegistryRetention = {
+        name = "container registry image retention policy";
+        test =
+          let
+            policy = containerRegistry.mkImageRetentionPolicy "cleanup" {
+              retentionDays = 30;
+              keepTagged = true;
+              keepLatest = true;
+              schedule = "0 2 * * *";
+            };
+          in
+            # Should create valid retention policy
+            (policy.baseName == "cleanup") &&
+            (policy.policyType == "image-retention") &&
+            (policy.retentionDays == 30) &&
+            (policy.keepTagged == true) &&
+            (policy.keepLatest == true) &&
+            (policy.schedule == "0 2 * * *");
+        expected = true;
+      };
+
+      # Test 117: Container Registry - Image Replication Policy
+      testContainerRegistryReplication = {
+        name = "container registry image replication policy";
+        test =
+          let
+            policy = containerRegistry.mkImageReplicationPolicy "to-dr" {
+              source = {
+                registry = "docker.io";
+                namespace = "my-company";
+              };
+              destination = {
+                registry = "dr-registry.example.com";
+              };
+              enabled = true;
+            };
+          in
+            # Should create valid replication policy
+            (policy.baseName == "to-dr") &&
+            (policy.policyType == "image-replication") &&
+            (policy.source.registry == "docker.io") &&
+            (policy.source.namespace == "my-company") &&
+            (policy.destination.registry == "dr-registry.example.com") &&
+            (policy.rules.pullImage == true) &&
+            (policy.enabled == true);
+        expected = true;
+      };
+
+      # Test 118: Container Registry - Framework Information
+      testContainerRegistryFrameworkInfo = {
+        name = "container registry framework information";
+        test =
+          let
+            framework = containerRegistry.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "container-registry") &&
+            (framework.version == "1.0.0") &&
+            (framework.features ? "dockerRegistry") &&
+            (framework.features ? "harbor") &&
+            (framework.features ? "nexus") &&
+            (framework.features ? "artifactory") &&
+            (framework.features ? "imageScanning") &&
+            (framework.features ? "imageRetention") &&
+            (framework.features ? "imageReplication") &&
+            (builtins.elem "docker" framework.supportedRegistries) &&
+            (builtins.elem "harbor" framework.supportedRegistries) &&
+            (builtins.elem "nexus" framework.supportedRegistries) &&
             (builtins.elem "1.26" framework.supportedK8sVersions) &&
             (builtins.elem "1.31" framework.supportedK8sVersions) &&
             (framework.maturity == "stable");
