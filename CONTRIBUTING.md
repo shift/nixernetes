@@ -1,314 +1,364 @@
-# CONTRIBUTING.md
-
 # Contributing to Nixernetes
 
-Thank you for your interest in contributing to Nixernetes! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to Nixernetes! This document provides guidelines and instructions for contributing to the project.
 
 ## Code of Conduct
 
-- Be respectful and inclusive
-- Provide constructive feedback
-- Focus on ideas, not individuals
-- Help others learn and grow
+We are committed to providing a welcoming and inspiring community for all. Please read and follow our Code of Conduct in all interactions.
 
-## Getting Started
+### Our Standards
 
-### 1. Fork and Clone
+- Use welcoming and inclusive language
+- Be respectful of differing opinions and experiences
+- Accept constructive criticism gracefully
+- Focus on what is best for the community
+- Show empathy towards other community members
+
+## How to Contribute
+
+### Reporting Bugs
+
+Before creating a bug report, check the issue list as you might find out that you don't need to create one. When you are creating a bug report, please include as many details as possible:
+
+- Use a clear and descriptive title
+- Describe the exact steps which reproduce the problem
+- Provide specific examples to demonstrate the steps
+- Describe the behavior you observed after following the steps
+- Explain which behavior you expected to see instead and why
+- Include screenshots or animated GIFs if possible
+- Include your environment details:
+  - Operating System and version
+  - Nix version
+  - Kubernetes version
+  - Nixernetes version
+
+### Suggesting Enhancements
+
+Enhancement suggestions are tracked as GitHub issues. When creating an enhancement suggestion, please include:
+
+- A clear and descriptive title
+- A detailed description of the suggested enhancement
+- Specific examples to demonstrate the steps or point out the part of Nixernetes which the suggestion is related to
+- A description of the current behavior and the expected behavior
+- Possible implementation details or design considerations
+
+### Pull Requests
+
+- Fill in the required template
+- Follow the Nix style guide
+- Include appropriate test cases
+- Update documentation as needed
+- End all files with a newline
+
+## Development Setup
+
+### Prerequisites
+
+- Nix 2.15+ with flakes enabled
+- direnv (optional but recommended)
+- Kubernetes 1.28 - 1.31 (for testing against actual clusters)
+- git
+
+### Getting Started
 
 ```bash
-git clone https://github.com/yourusername/nixernetes.git
+# Clone the repository
+git clone https://github.com/nixernetes/nixernetes.git
 cd nixernetes
+
+# Option 1: Use direnv (recommended)
 direnv allow
+
+# Option 2: Or manually enter Nix shell
+nix develop
+
+# You now have access to: nix, nixpkgs-fmt, yq, jq, python3
 ```
 
-### 2. Create a Branch
+### Project Structure
 
-```bash
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/your-bug-fix
-# or
-git checkout -b docs/your-documentation
+```
+nixernetes/
+├── src/
+│   ├── lib/                 # 35 production modules
+│   │   ├── foundation/      # Foundation modules (4)
+│   │   ├── core/            # Core Kubernetes modules (5)
+│   │   ├── security/        # Security & Compliance modules (8)
+│   │   ├── observability/   # Observability modules (6)
+│   │   ├── data-events/     # Data & Events modules (4)
+│   │   ├── workloads/       # Workloads modules (4)
+│   │   └── operations/      # Operations modules (4)
+│   └── examples/            # Example configurations
+├── backend/                 # Node.js/Express backend API
+├── web-ui/                  # React web interface
+├── terraform-provider/      # Terraform provider
+├── tests/                   # Test files
+├── docs/                    # Public documentation (34 files)
+├── .internal/               # Internal team materials (gitignored)
+└── .summaries/              # Session notes (gitignored)
 ```
 
-Branch naming conventions:
-- `feature/*` - New features
-- `fix/*` - Bug fixes
-- `docs/*` - Documentation
-- `refactor/*` - Code refactoring
-- `test/*` - Tests
-- `ci/*` - CI/CD improvements
+### Code Style
 
-### 3. Make Changes
+#### Nix Code
 
-- Write clean, readable code
-- Follow existing code style
-- Add tests for new functionality
-- Update documentation
-
-### 4. Validate Your Changes
+We follow the nixpkgs style guide. Use `nixpkgs-fmt` to format all Nix files:
 
 ```bash
-# Run validations
-nix flake check --offline
+# Format a single file
+nixpkgs-fmt src/lib/schema.nix
 
-# Run tests
+# Format all Nix files
+find src -name "*.nix" -exec nixpkgs-fmt {} \;
+
+# Or use the git hook (if enabled)
+git pre-commit run
+```
+
+#### TypeScript/JavaScript
+
+The backend API and web UI follow these conventions:
+
+- Use TypeScript for type safety
+- Follow ESLint configuration in the project
+- Use Prettier for code formatting
+- Use camelCase for variables and functions
+- Use PascalCase for classes and components
+
+```bash
+# Format TypeScript files
+cd backend && npm run format
+cd ../web-ui && npm run format
+```
+
+#### Documentation
+
+- Use clear, professional language
+- Include code examples where appropriate
+- Update table of contents for large documents
+- Link to related documentation
+- Keep line lengths reasonable (80-100 characters)
+
+### Testing
+
+#### Running Tests
+
+```bash
+# Run all Nix checks
 nix flake check
 
-# Format code
-nixpkgs-fmt src/
+# Run backend tests
+cd backend && npm test
 
-# Verify examples work
-nix eval ./src/examples/your-example.nix --json
+# Run integration tests
+nix flake check --option timeout 300
+
+# Test specific module
+nix flake check --check module-name
 ```
 
-### 5. Commit Your Changes
+#### Writing Tests
 
-Commit messages should be clear and descriptive:
-
-```bash
-git commit -m "feat: add new batch processing builder
-
-- Implement mkBatchJob builder
-- Support custom timeout settings
-- Add integration tests (tests 159-161)
-- Update documentation with examples"
-```
-
-Commit message format:
-```
-<type>: <short summary>
-
-<longer description>
-
-- Bullet points for details
-- Each change clearly described
-```
-
-Types:
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation
-- `style:` - Formatting (no logic change)
-- `refactor:` - Code refactoring
-- `test:` - Add/update tests
-- `ci:` - CI/CD changes
-- `chore:` - Build, dependencies, etc.
-
-### 6. Push and Create Pull Request
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a pull request on GitHub.
-
-## Pull Request Process
-
-### Before Submitting
-
-1. **Pass all checks**: `nix flake check`
-2. **Update tests**: Add tests for new features
-3. **Update docs**: Document new functionality
-4. **Update examples**: Show how to use new features
-5. **Self-review**: Check your own code first
-
-### PR Description Template
-
-```markdown
-## Description
-Brief description of changes
-
-## Type of Change
-- [ ] New feature
-- [ ] Bug fix
-- [ ] Documentation update
-- [ ] Code refactoring
-- [ ] Performance improvement
-
-## Testing
-- [ ] Added unit tests
-- [ ] Added integration tests
-- [ ] Manual testing completed
-
-## Checklist
-- [ ] Code follows style guidelines
-- [ ] Documentation updated
-- [ ] Tests pass locally
-- [ ] Flake checks pass
-- [ ] No breaking changes (or documented)
-
-## Related Issues
-Closes #issue-number
-```
-
-### Review Process
-
-1. Automatic checks run (flake checks, tests)
-2. Code review by maintainers
-3. Feedback and iteration
-4. Approval and merge
-
-## Contribution Types
-
-### 1. Adding a New Module
-
-Steps to add Module 36 (example):
-
-1. **Create module file**: `src/lib/module-name.nix`
-   - Follow existing module pattern
-   - Include 10 builders (convention)
-   - Add proper documentation
-
-2. **Create documentation**: `docs/MODULE_NAME.md`
-   - Overview section
-   - Builder reference
-   - Usage examples
-   - Best practices
-
-3. **Create examples**: `src/examples/module-name-example.nix`
-   - 18 production-ready examples
-   - Cover common use cases
-   - Include comments
-
-4. **Add integration tests**: `tests/integration-tests.nix`
-   - 8 tests per module
-   - Test builders
-   - Test framework features
-
-5. **Update flake.nix**:
-   - Add module import
-   - Add lib-* package
-   - Add module tests
-   - Add flake check
-
-6. **Create PR with**:
-   - All files above
-   - Clear commit message
-   - Link to related issues
-
-### 2. Improving Documentation
-
-1. Identify gap or improvement
-2. Edit relevant `.md` file
-3. Add examples if needed
-4. Create PR with changes
-
-### 3. Fixing Bugs
-
-1. Create issue describing bug
-2. Create branch: `fix/issue-description`
-3. Make fix
-4. Add test verifying fix
-5. Create PR referencing issue
-
-### 4. Improving Tests
-
-1. Identify missing coverage
-2. Add tests in `tests/integration-tests.nix`
-3. Verify new tests pass
-4. Create PR with explanation
-
-## Code Style
-
-### Nix Style
+For Nix modules, add tests to `tests/integration-tests.nix`:
 
 ```nix
-# Use consistent indentation (2 spaces)
-let
-  myVar = { ... };
-in
-{
-  # Format functions nicely
-  mkBuilder = config:
-    let
-      validated = validate config;
-    in
-    resource;
-}
-```
-
-### Comments
-
-```nix
-# Comment what and why, not how
-mkBuilder = config:
-  # Validate that required fields are present
-  let
-    validated = lib.recursiveUpdate defaults config;
-  in
-  # Generate Kubernetes resource with framework labels
-  resource;
-```
-
-### Naming
-
-- `mkFoo` - Builders (constructors)
-- `validateFoo` - Validators
-- `fooToBar` - Converters
-- `isFoo` - Predicates
-- `fooList` - List data
-- `defaultFoo` - Default values
-
-## Testing
-
-### Running Tests
-
-```bash
-# Run all tests
-nix flake check
-
-# Run specific test
-nix eval ./tests/integration-tests.nix --offline
-
-# Run with offline mode
-nix flake check --offline
-```
-
-### Writing Tests
-
-Add to `tests/integration-tests.nix`:
-
-```nix
-test-xyz = {
-  description = "Test description";
-  
-  # Create test resources
-  resources = [
-    (mkBuilder { ... })
-  ];
-  
-  # Verify expectations
-  assertions = [
-    (builtins.hasAttr "apiVersion" resource)
-    (builtins.hasAttr "kind" resource)
-  ];
+# Example test
+testExample = {
+  description = "Example test description";
+  assertion = mkAssert (
+    myModule.mkFunction { arg = value; }
+  ) expectedResult;
 };
 ```
 
-## Releasing
+For backend API, add tests to `backend/src/server.test.ts` using Vitest.
 
-For maintainers only:
+### Building
 
-1. Update version in `flake.nix`
+#### Build Targets
+
+```bash
+# Build all targets
+nix build
+
+# Build specific target
+nix build .#lib-schema
+nix build .#example-app
+
+# Run development server
+cd backend && npm run dev
+cd ../web-ui && npm run dev
+
+# Build production bundles
+nix build .#backend:production
+nix build .#web-ui:production
+
+# Build Docker image
+docker build -t nixernetes:latest .
+```
+
+### Module Development
+
+When adding a new module:
+
+1. Create the module file in the appropriate category under `src/lib/`
+2. Follow the established module structure:
+
+```nix
+{ lib }:
+
+{
+  # Module description
+  mkMyFeature = { 
+    name,
+    config ? {},
+    # ... other parameters
+  }:
+  
+  # Module implementation
+  {
+    # Resource definitions or builders
+  };
+  
+  # Helper functions
+  helper1 = /* ... */;
+  helper2 = /* ... */;
+}
+```
+
+3. Add tests in `tests/integration-tests.nix`
+4. Add documentation in `docs/` directory
+5. Update `flake.nix` to include the new module
+6. Update `MODULE_REFERENCE.md` with API documentation
+
+### Documentation
+
+When contributing code, also update the relevant documentation:
+
+1. **API Changes**: Update `docs/API.md` and `MODULE_REFERENCE.md`
+2. **New Features**: Add to `docs/FEATURES.md` or create a new guide
+3. **Examples**: Add example configurations to `src/examples/`
+4. **Guides**: Create or update relevant guides in `docs/`
+
+### Commit Message Guidelines
+
+We follow conventional commits format:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+#### Types
+
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Changes that do not affect the meaning of the code (formatting, etc)
+- **refactor**: A code change that neither fixes a bug nor adds a feature
+- **perf**: A code change that improves performance
+- **test**: Adding missing tests or correcting existing tests
+- **chore**: Changes to build process, dependencies, etc
+
+#### Scope
+
+The scope should specify what is being changed:
+- `core`: Core framework changes
+- `schema`: Schema validation module
+- `compliance`: Compliance framework
+- `security`: Security module
+- `api`: Backend API
+- `ui`: Web UI
+- `terraform`: Terraform provider
+- `docs`: Documentation
+
+#### Subject
+
+- Use the imperative mood ("add feature" not "added feature")
+- Don't capitalize first letter
+- No period (.) at the end
+- Limit to 50 characters
+- Reference issues and PRs liberally after the subject line
+
+#### Body
+
+- Explain what and why, not how
+- Wrap at 72 characters
+- Separate from subject with blank line
+
+#### Examples
+
+```
+feat(schema): add kubernetes 1.31 schema support
+
+Add OpenAPI schema for Kubernetes 1.31 with new API groups
+and deprecation notices for removed APIs.
+
+Closes #123
+```
+
+```
+fix(compliance): enforce audit logging for restricted level
+
+Audit logging was optional for restricted compliance level.
+Now enforce it as required per compliance standards.
+
+Fixes #456
+```
+
+## Release Process
+
+### Version Numbering
+
+We follow [Semantic Versioning](https://semver.org/):
+
+- **MAJOR** (X.0.0): Breaking changes
+- **MINOR** (0.Y.0): New features (backward compatible)
+- **PATCH** (0.0.Z): Bug fixes (backward compatible)
+
+### Release Checklist
+
+See `.internal/docs/RELEASE_CHECKLIST.md` for the complete release process.
+
+Key steps:
+1. Run full test suite (`nix flake check`)
 2. Update `CHANGELOG.md`
-3. Create tag: `git tag v1.0.0`
-4. Push tags: `git push origin --tags`
-5. Create GitHub release
+3. Update version in `flake.nix`
+4. Create release tag: `git tag -a v1.0.0 -m "Release v1.0.0"`
+5. Create GitHub Release with release notes
 
-## Resources
+## Community
 
-- **Documentation**: `/docs` directory
-- **Examples**: `/src/examples` directory
-- **API Reference**: `docs/API.md`
-- **Architecture**: `ARCHITECTURE.md`
-- **Getting Started**: `GETTING_STARTED.md`
+### Communication Channels
+
+- **GitHub Issues**: Report bugs and request features
+- **GitHub Discussions**: Ask questions and share ideas
+- **GitHub PR Comments**: Discuss code changes
+- **Email**: For sensitive security issues, email security@nixernetes.dev
+
+### Getting Help
+
+- Check existing issues and discussions
+- Review documentation in `docs/`
+- Look at examples in `src/examples/`
+- Open a discussion if your question is not covered
+
+## Recognition
+
+Contributors will be recognized in:
+- Release notes
+- `CONTRIBUTORS.md` file (if applicable)
+- Project README
+
+## Legal
+
+By contributing to Nixernetes, you agree that your contributions will be licensed under the same MIT License that covers the project.
 
 ## Questions?
 
-- Open an issue with `question:` label
-- Check existing issues/discussions
-- Read documentation thoroughly
+Feel free to open an issue labeled "question" or start a discussion on GitHub.
 
-Thank you for contributing! 🎉
-
+Thank you for contributing to Nixernetes!
