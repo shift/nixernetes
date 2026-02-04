@@ -67,25 +67,41 @@ class KubernetesAPIParser:
         Download Kubernetes OpenAPI spec for a specific version
         
         Args:
-            version: Kubernetes version (e.g., "1.28.0")
+            version: Kubernetes version (e.g., "1.28" or "1.28.0")
             
         Returns:
             Parsed JSON spec dictionary
         """
-        # Construct URL for the specific K8s version
-        # Using the official Kubernetes repository releases
-        url = f"https://raw.githubusercontent.com/kubernetes/kubernetes/v{version}/api/openapi-spec/swagger.json"
+        # Try multiple URL formats to handle different version inputs
+        # Format 1: v1.28.0 (full release)
+        # Format 2: v1.28 (latest patch of minor version)
+        # Format 3: release-1.28 (branch name)
         
-        print(f"Downloading Kubernetes {version} OpenAPI spec from: {url}", file=sys.stderr)
+        url_formats = [
+            f"https://raw.githubusercontent.com/kubernetes/kubernetes/v{version}/api/openapi-spec/swagger.json",
+            f"https://raw.githubusercontent.com/kubernetes/kubernetes/release-{version}/api/openapi-spec/swagger.json",
+        ]
         
-        try:
-            with urllib.request.urlopen(url, timeout=30) as response:
-                data = response.read()
-                return json.loads(data)
-        except urllib.error.URLError as e:
-            raise RuntimeError(f"Failed to download spec for version {version}: {e}")
-        except json.JSONDecodeError as e:
-            raise RuntimeError(f"Failed to parse JSON for version {version}: {e}")
+        # If version doesn't have patch number, try with .0
+        if version.count('.') == 1:
+            url_formats.insert(1, f"https://raw.githubusercontent.com/kubernetes/kubernetes/v{version}.0/api/openapi-spec/swagger.json")
+        
+        last_error = None
+        for url in url_formats:
+            try:
+                print(f"Trying: {url}", file=sys.stderr)
+                with urllib.request.urlopen(url, timeout=30) as response:
+                    data = response.read()
+                    print(f"✓ Downloaded from: {url}", file=sys.stderr)
+                    return json.loads(data)
+            except urllib.error.URLError as e:
+                last_error = e
+                continue
+            except json.JSONDecodeError as e:
+                raise RuntimeError(f"Failed to parse JSON for version {version}: {e}")
+        
+        # All URLs failed
+        raise RuntimeError(f"Failed to download spec for version {version}. Tried: {', '.join(url_formats)}. Error: {last_error}")
 
     def extract_api_map(self, spec: Dict) -> Dict[str, str]:
         """
