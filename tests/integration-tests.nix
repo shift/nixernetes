@@ -30,10 +30,11 @@ let
     securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
     performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
-     policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
-      helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
-      advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
-      disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
+      policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
+       helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
+       advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
+       disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
+       multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -2182,4 +2183,237 @@ in
         expected = true;
       };
 
+      # Test 87: Multi-Tenancy - Tenant Creation
+      testMultiTenancyTenantCreation = {
+        name = "multi-tenancy tenant creation";
+        test =
+          let
+            tenant = multiTenancy.mkTenant "acme-corp" {
+              namespace = "acme-corp";
+              displayName = "ACME Corporation";
+              description = "Main production tenant";
+              cpuQuota = "200";
+              memoryQuota = "512Gi";
+              storageQuota = "2Ti";
+              podQuota = 1000;
+              isolationLevel = "standard";
+              networkIsolation = true;
+              ingressEnabled = true;
+              owner = "admin@acme.com";
+              admins = ["admin1@acme.com" "admin2@acme.com"];
+              billingContact = "billing@acme.com";
+              costCenter = "ACME-001";
+            };
+          in
+            # Should create valid tenant
+            (tenant.name == "acme-corp") &&
+            (tenant.namespace == "acme-corp") &&
+            (tenant.displayName == "ACME Corporation") &&
+            (tenant.cpuQuota == "200") &&
+            (tenant.memoryQuota == "512Gi") &&
+            (tenant.isolationLevel == "standard") &&
+            (tenant.networkIsolation == true) &&
+            (tenant.labels ? "nixernetes.io/tenant");
+        expected = true;
+      };
+
+      # Test 88: Multi-Tenancy - Namespace Quota
+      testMultiTenancyNamespaceQuota = {
+        name = "multi-tenancy namespace quota";
+        test =
+          let
+            quota = multiTenancy.mkNamespaceQuota "acme-prod" {
+              namespace = "acme-prod";
+              cpuQuota = "200";
+              memoryQuota = "512Gi";
+              storageQuota = "2Ti";
+              podQuota = 500;
+              deploymentQuota = 100;
+              statefulsetQuota = 20;
+              pvQuota = 100;
+              serviceQuota = 100;
+            };
+          in
+            # Should create valid quota
+            (quota.name == "acme-prod") &&
+            (quota.namespace == "acme-prod") &&
+            (quota.cpuQuota == "200") &&
+            (quota.memoryQuota == "512Gi") &&
+            (quota.podQuota == 500) &&
+            (quota.deploymentQuota == 100) &&
+            (quota.statefulsetQuota == 20);
+        expected = true;
+      };
+
+      # Test 89: Multi-Tenancy - Network Policy
+      testMultiTenancyNetworkPolicy = {
+        name = "multi-tenancy network policy";
+        test =
+          let
+            policy = multiTenancy.mkTenantNetworkPolicy "acme" {
+              namespace = "acme";
+              ingressEnabled = true;
+              allowFromSameTenant = true;
+              allowFromNamespaces = ["ingress-nginx"];
+              egressEnabled = true;
+              allowToSameTenant = true;
+              allowToDns = true;
+              allowToExternal = false;
+              allowedPorts = [80 443];
+            };
+          in
+            # Should create valid network policy
+            (policy.name == "tenant-acme") &&
+            (policy.namespace == "acme") &&
+            (policy.ingressEnabled == true) &&
+            (policy.egressEnabled == true) &&
+            (policy.allowToDns == true) &&
+            (builtins.length policy.allowedPorts == 2);
+        expected = true;
+      };
+
+      # Test 90: Multi-Tenancy - RBAC Configuration
+      testMultiTenancyRBAC = {
+        name = "multi-tenancy rbac configuration";
+        test =
+          let
+            rbac = multiTenancy.mkTenantRBAC "acme" {
+              namespace = "acme";
+              admins = ["admin@acme.com"];
+              developers = ["dev1@acme.com" "dev2@acme.com"];
+              viewers = ["viewer@acme.com"];
+              serviceAccounts = ["ci-cd" "monitoring"];
+            };
+          in
+            # Should create valid RBAC
+            (rbac.name == "acme") &&
+            (rbac.namespace == "acme") &&
+            (rbac.roles ? "admin") &&
+            (rbac.roles ? "developer") &&
+            (rbac.roles ? "viewer") &&
+            (builtins.length rbac.admins == 1) &&
+            (builtins.length rbac.developers == 2) &&
+            (builtins.length rbac.serviceAccounts == 2);
+        expected = true;
+      };
+
+      # Test 91: Multi-Tenancy - Resource Limits
+      testMultiTenancyResourceLimits = {
+        name = "multi-tenancy resource limits";
+        test =
+          let
+            limits = multiTenancy.mkTenantResourceLimits "acme" {
+              namespace = "acme";
+              podCpuLimit = "10";
+              podMemoryLimit = "32Gi";
+              podCpuRequest = "100m";
+              podMemoryRequest = "128Mi";
+              containerCpuLimit = "8";
+              containerMemoryLimit = "16Gi";
+              qosClass = "Burstable";
+              allowBursting = true;
+              minReplicas = 2;
+            };
+          in
+            # Should create valid resource limits
+            (limits.name == "acme") &&
+            (limits.namespace == "acme") &&
+            (limits.podCpuLimit == "10") &&
+            (limits.podMemoryLimit == "32Gi") &&
+            (limits.containerCpuLimit == "8") &&
+            (limits.qosClass == "Burstable") &&
+            (limits.allowBursting == true) &&
+            (limits.minReplicas == 2);
+        expected = true;
+      };
+
+      # Test 92: Multi-Tenancy - Billing Configuration
+      testMultiTenancyBilling = {
+        name = "multi-tenancy billing configuration";
+        test =
+          let
+            billing = multiTenancy.mkTenantBilling "acme" {
+              tenantId = "acme-001";
+              tenantName = "ACME Corporation";
+              billingContact = "billing@acme.com";
+              costCenter = "ACME-001";
+              billingCycle = "monthly";
+              cpuHourlyRate = 0.05;
+              memoryHourlyRate = 0.01;
+              storageMonthlyRate = 0.10;
+              networkEgressRate = 0.02;
+              monthlyBudget = 5000;
+              budgetAlertThreshold = 0.80;
+              budgetEnforcement = true;
+            };
+          in
+            # Should create valid billing
+            (billing.tenantId == "acme-001") &&
+            (billing.tenantName == "ACME Corporation") &&
+            (billing.billingCycle == "monthly") &&
+            (billing.cpuHourlyRate == 0.05) &&
+            (billing.monthlyBudget == 5000) &&
+            (billing.budgetAlertThreshold == 0.80) &&
+            (billing.budgetEnforcement == true);
+        expected = true;
+      };
+
+      # Test 93: Multi-Tenancy - Isolation Policy
+      testMultiTenancyIsolationPolicy = {
+        name = "multi-tenancy isolation policy";
+        test =
+          let
+            policy = multiTenancy.mkTenantIsolationPolicy "acme" {
+              namespace = "acme";
+              isolationLevel = "strict";
+              networkIsolation = true;
+              storageIsolation = true;
+              podSecurityPolicy = "restricted";
+              secretsEncryption = true;
+              encryptionAtRest = true;
+              apiAudit = true;
+              auditLevel = "Metadata";
+              allowedRegistries = ["gcr.io" "docker.io"];
+              imageVerification = true;
+            };
+          in
+            # Should create valid isolation policy
+            (policy.isolationLevel == "strict") &&
+            (policy.networkIsolation == true) &&
+            (policy.storageIsolation == true) &&
+            (policy.podSecurityPolicy == "restricted") &&
+            (policy.secretsEncryption == true) &&
+            (policy.encryptionAtRest == true) &&
+            (policy.apiAudit == true) &&
+            (builtins.length policy.allowedRegistries == 2) &&
+            (policy.imageVerification == true);
+        expected = true;
+      };
+
+      # Test 94: Multi-Tenancy - Framework Information
+      testMultiTenancyFrameworkInfo = {
+        name = "multi-tenancy framework information";
+        test =
+          let
+            framework = multiTenancy.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "Nixernetes Multi-Tenancy") &&
+            (framework.version == "1.0.0") &&
+            (framework.features ? "tenant-management") &&
+            (framework.features ? "namespace-quotas") &&
+            (framework.features ? "network-policies") &&
+            (framework.features ? "rbac") &&
+            (framework.features ? "resource-limits") &&
+            (framework.features ? "billing") &&
+            (framework.features ? "isolation-policies") &&
+            (framework.features ? "monitoring") &&
+            (framework.features ? "backup-restore") &&
+            (framework.features ? "audit") &&
+            (builtins.elem "strict" framework.supportedIsolationLevels) &&
+            (builtins.elem "monthly" framework.supportedBillingCycles);
+        expected = true;
+      };
+
 }
+
