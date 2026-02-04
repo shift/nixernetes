@@ -1,0 +1,386 @@
+#!/usr/bin/env python3
+"""
+Nixernetes CLI - Command-line interface for Nixernetes framework
+"""
+
+import argparse
+import subprocess
+import sys
+import json
+import os
+from pathlib import Path
+from typing import Optional, Dict, Any, List
+
+class NixernetesCommand:
+    """Base class for Nixernetes commands"""
+    
+    def __init__(self):
+        self.project_root = self._find_project_root()
+    
+    @staticmethod
+    def _find_project_root() -> Path:
+        """Find project root by looking for flake.nix"""
+        current = Path.cwd()
+        while current != current.parent:
+            if (current / "flake.nix").exists():
+                return current
+            current = current.parent
+        raise RuntimeError("Could not find project root (flake.nix)")
+    
+    def run_nix_command(self, args: List[str]) -> str:
+        """Run a nix command and return output"""
+        result = subprocess.run(
+            ["nix"] + args,
+            cwd=str(self.project_root),
+            capture_output=True,
+            text=True
+        )
+        if result.returncode != 0:
+            print(f"Error: {result.stderr}", file=sys.stderr)
+            sys.exit(result.returncode)
+        return result.stdout.strip()
+
+
+class ValidateCommand(NixernetesCommand):
+    """Validate Nixernetes configuration"""
+    
+    def run(self, args):
+        """Validate flake and modules"""
+        print("Running Nixernetes validation...")
+        
+        # Run flake check
+        print("\n✓ Checking flake.nix...")
+        output = self.run_nix_command(["flake", "check", "--offline"])
+        print(output)
+        
+        # Validate modules
+        print("\n✓ Checking module syntax...")
+        modules = list((self.project_root / "src" / "lib").glob("*.nix"))
+        print(f"Found {len(modules)} modules")
+        
+        # Try to evaluate modules
+        print("\n✓ Evaluating modules...")
+        try:
+            for module in sorted(modules):
+                module_name = module.stem
+                print(f"  - {module_name}...", end=" ")
+                self.run_nix_command(["eval", f"./src/lib/{module_name}.nix", "--json", "--offline"])
+                print("OK")
+        except Exception as e:
+            print(f"FAILED: {e}")
+            sys.exit(1)
+        
+        print("\n✓ All validations passed!")
+
+
+class InitCommand(NixernetesCommand):
+    """Initialize a new Nixernetes project"""
+    
+    def run(self, args):
+        """Initialize project structure"""
+        project_name = args.name or "my-nixernetes-project"
+        
+        print(f"Initializing Nixernetes project: {project_name}")
+        
+        project_dir = Path(project_name)
+        project_dir.mkdir(exist_ok=True)
+        
+        # Create directory structure
+        (project_dir / "config").mkdir(exist_ok=True)
+        (project_dir / "modules").mkdir(exist_ok=True)
+        (project_dir / ".envrc").write_text("use flake\n")
+        
+        # Create minimal flake.nix
+        flake_content = '''{ description = "Nixernetes project";
+
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+        lib = pkgs.lib;
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            nix
+            nixpkgs-fmt
+            kubectl
+            kubernetes-helm
+            jq
+          ];
+        };
+      }
+    );
+}
+'''
+        (project_dir / "flake.nix").write_text(flake_content)
+        
+        # Create main configuration
+        config_content = '''{ lib }:
+
+let
+  k8s = import ./modules/kubernetes-core.nix { inherit lib; };
+in
+{
+  # Define your infrastructure here
+  deployment = k8s.mkDeployment {
+    namespace = "default";
+    name = "my-app";
+    replicas = 1;
+    containers = [{
+      image = "nginx:latest";
+      ports = [{ containerPort = 80; }];
+    }];
+  };
+}
+'''
+        (project_dir / "config" / "main.nix").write_text(config_content)
+        
+        print(f"\n✓ Project initialized in {project_dir}")
+        print(f"\nNext steps:")
+        print(f"  cd {project_name}")
+        print(f"  direnv allow")
+        print(f"  nix flake update")
+
+
+class GenerateCommand(NixernetesCommand):
+    """Generate Kubernetes YAML from Nixernetes config"""
+    
+    def run(self, args):
+        """Generate YAML resources"""
+        config_file = args.config or "config/main.nix"
+        output_file = args.output or "resources.yaml"
+        
+        print(f"Generating YAML from {config_file}...")
+        
+        # Evaluate config to JSON
+        try:
+            json_output = self.run_nix_command([
+                "eval",
+                f"./{config_file}",
+                "--json",
+                "--arg", "lib", "import <nixpkgs/lib>"
+            ])
+            
+            config = json.loads(json_output)
+            
+            # Convert to YAML format
+            yaml_content = self._dict_to_yaml(config)
+            
+            # Write to file
+            with open(output_file, 'w') as f:
+                f.write(yaml_content)
+            
+            print(f"✓ Generated {output_file}")
+            print(f"  Resources: {self._count_resources(config)}")
+            
+        except Exception as e:
+            print(f"Error generating YAML: {e}", file=sys.stderr)
+            sys.exit(1)
+    
+    @staticmethod
+    def _count_resources(obj: Any) -> int:
+        """Count Kubernetes resources"""
+        count = 0
+        if isinstance(obj, dict):
+            if "apiVersion" in obj and "kind" in obj:
+                count = 1
+            for v in obj.values():
+                count += GenerateCommand._count_resources(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                count += GenerateCommand._count_resources(item)
+        return count
+    
+    @staticmethod
+    def _dict_to_yaml(obj: Any, indent: int = 0) -> str:
+        """Convert dict to YAML string"""
+        yaml_lines = []
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if isinstance(v, (dict, list)):
+                    yaml_lines.append(f"{'  ' * indent}{k}:")
+                    yaml_lines.append(GenerateCommand._dict_to_yaml(v, indent + 1))
+                else:
+                    yaml_lines.append(f"{'  ' * indent}{k}: {v}")
+        elif isinstance(obj, list):
+            for item in obj:
+                yaml_lines.append(f"{'  ' * indent}- ")
+                if isinstance(item, dict):
+                    yaml_lines.append(GenerateCommand._dict_to_yaml(item, indent + 1))
+        return "\n".join(filter(None, yaml_lines))
+
+
+class DeployCommand(NixernetesCommand):
+    """Deploy configuration to Kubernetes cluster"""
+    
+    def run(self, args):
+        """Deploy to cluster"""
+        config_file = args.config or "config/main.nix"
+        namespace = args.namespace or "default"
+        dry_run = args.dry_run
+        
+        print(f"Deploying from {config_file} to namespace {namespace}...")
+        
+        if dry_run:
+            print("(DRY RUN - no changes will be applied)")
+        
+        # Generate YAML
+        gen_cmd = GenerateCommand()
+        gen_cmd.run(argparse.Namespace(
+            config=config_file,
+            output="/tmp/nixernetes-deploy.yaml"
+        ))
+        
+        # Apply to cluster
+        kubectl_args = ["kubectl", "apply", "-f", "/tmp/nixernetes-deploy.yaml", "-n", namespace]
+        
+        if dry_run:
+            kubectl_args.insert(-1, "--dry-run=client")
+        
+        result = subprocess.run(kubectl_args, cwd=str(self.project_root))
+        sys.exit(result.returncode)
+
+
+class TestCommand(NixernetesCommand):
+    """Run tests"""
+    
+    def run(self, args):
+        """Run test suite"""
+        print("Running Nixernetes tests...")
+        
+        # Run integration tests
+        print("\n✓ Running integration tests...")
+        output = self.run_nix_command(["flake", "check", "--offline"])
+        
+        if "passed" in output.lower() or "running" in output.lower():
+            print("✓ All tests passed!")
+        else:
+            print("Some tests failed")
+            print(output)
+            sys.exit(1)
+
+
+class ListCommand(NixernetesCommand):
+    """List available modules"""
+    
+    def run(self, args):
+        """List modules"""
+        modules_dir = self.project_root / "src" / "lib"
+        
+        print("Available Nixernetes modules:\n")
+        
+        # Import from nixernetes framework
+        framework_modules = list(modules_dir.glob("*.nix"))
+        
+        for module in sorted(framework_modules):
+            name = module.stem
+            size = module.stat().st_size
+            print(f"  {name:<30} ({size:>6} bytes)")
+        
+        print(f"\nTotal: {len(framework_modules)} modules")
+
+
+class DocsCommand(NixernetesCommand):
+    """Open documentation"""
+    
+    def run(self, args):
+        """Open docs"""
+        docs_dir = self.project_root / "docs"
+        
+        if args.module:
+            doc_file = docs_dir / f"{args.module.upper()}.md"
+            if doc_file.exists():
+                print(f"Opening {doc_file}")
+                subprocess.run(["less", str(doc_file)])
+            else:
+                print(f"Documentation for {args.module} not found")
+                print(f"Available docs:")
+                for doc in sorted(docs_dir.glob("*.md")):
+                    print(f"  - {doc.stem}")
+        else:
+            # List available docs
+            print("Available documentation:\n")
+            for doc in sorted(docs_dir.glob("*.md")):
+                print(f"  - {doc.stem}")
+            print(f"\nRun 'nixernetes docs MODULE_NAME' to view module documentation")
+
+
+def main():
+    """Main CLI entry point"""
+    parser = argparse.ArgumentParser(
+        description="Nixernetes - Enterprise Kubernetes Framework",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  nixernetes validate                    # Validate configuration
+  nixernetes init my-project             # Create new project
+  nixernetes generate                    # Generate YAML
+  nixernetes deploy --dry-run            # Test deployment
+  nixernetes list                        # List modules
+  nixernetes docs BATCH_PROCESSING       # View module docs
+        """
+    )
+    
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+    
+    # Validate command
+    validate_parser = subparsers.add_parser("validate", help="Validate configuration")
+    
+    # Init command
+    init_parser = subparsers.add_parser("init", help="Initialize new project")
+    init_parser.add_argument("name", nargs="?", help="Project name")
+    
+    # Generate command
+    gen_parser = subparsers.add_parser("generate", help="Generate YAML")
+    gen_parser.add_argument("--config", "-c", help="Config file")
+    gen_parser.add_argument("--output", "-o", help="Output file")
+    
+    # Deploy command
+    deploy_parser = subparsers.add_parser("deploy", help="Deploy to cluster")
+    deploy_parser.add_argument("--config", "-c", help="Config file")
+    deploy_parser.add_argument("--namespace", "-n", help="Kubernetes namespace")
+    deploy_parser.add_argument("--dry-run", action="store_true", help="Dry run mode")
+    
+    # Test command
+    test_parser = subparsers.add_parser("test", help="Run tests")
+    
+    # List command
+    list_parser = subparsers.add_parser("list", help="List modules")
+    
+    # Docs command
+    docs_parser = subparsers.add_parser("docs", help="Open documentation")
+    docs_parser.add_argument("module", nargs="?", help="Module name")
+    
+    args = parser.parse_args()
+    
+    if not args.command:
+        parser.print_help()
+        sys.exit(0)
+    
+    # Execute command
+    commands = {
+        "validate": ValidateCommand,
+        "init": InitCommand,
+        "generate": GenerateCommand,
+        "deploy": DeployCommand,
+        "test": TestCommand,
+        "list": ListCommand,
+        "docs": DocsCommand,
+    }
+    
+    command_class = commands.get(args.command)
+    if command_class:
+        cmd = command_class()
+        cmd.run(args)
+    else:
+        parser.print_help()
+
+
+if __name__ == "__main__":
+    main()
