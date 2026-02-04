@@ -36,3 +36,6 @@ venv/
 
 # Summary documents
 .summaries/
+
+# Internal documentation and team materials
+.internal/
