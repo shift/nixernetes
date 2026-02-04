@@ -16,6 +16,8 @@
          nixernetes = {
            schema = import ./src/lib/schema.nix { inherit lib; };
            compliance = import ./src/lib/compliance.nix { inherit lib; };
+           complianceEnforcement = import ./src/lib/compliance-enforcement.nix { inherit lib; };
+           complianceProfiles = import ./src/lib/compliance-profiles.nix { inherit lib; };
            policies = import ./src/lib/policies.nix { inherit lib; };
            output = import ./src/lib/output.nix { inherit lib pkgs; };
            types = import ./src/lib/types.nix { inherit lib; };
@@ -54,6 +56,8 @@
              lib-types = pkgs.writeText "lib-types.nix" (builtins.readFile ./src/lib/types.nix);
              lib-validation = pkgs.writeText "lib-validation.nix" (builtins.readFile ./src/lib/validation.nix);
              lib-generators = pkgs.writeText "lib-generators.nix" (builtins.readFile ./src/lib/generators.nix);
+             lib-compliance-enforcement = pkgs.writeText "lib-compliance-enforcement.nix" (builtins.readFile ./src/lib/compliance-enforcement.nix);
+             lib-compliance-profiles = pkgs.writeText "lib-compliance-profiles.nix" (builtins.readFile ./src/lib/compliance-profiles.nix);
 
            # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
@@ -133,12 +137,16 @@
                output = builtins.readFile ./src/lib/output.nix;
                types = builtins.readFile ./src/lib/types.nix;
                validation = builtins.readFile ./src/lib/validation.nix;
-               generators = builtins.readFile ./src/lib/generators.nix;
+             generators = builtins.readFile ./src/lib/generators.nix;
+             complianceEnforcement = builtins.readFile ./src/lib/compliance-enforcement.nix;
+             complianceProfiles = builtins.readFile ./src/lib/compliance-profiles.nix;
              }
              ''
               echo "✓ All module files readable"
               echo "✓ Schema module loaded"
               echo "✓ Compliance module loaded"
+              echo "✓ Compliance enforcement module loaded"
+              echo "✓ Compliance profiles module loaded"
               echo "✓ Policies module loaded"
               echo "✓ Output module loaded"
               echo "✓ Types module loaded"
