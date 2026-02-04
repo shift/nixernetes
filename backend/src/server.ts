@@ -5,15 +5,39 @@ import { initializeDatabase } from '@db/database'
 import { ProjectRepository, ManifestRepository, ConfigurationRepository, ActivityRepository } from '@models/repositories'
 import type { Project, Manifest, Configuration, ValidationResult } from '@models/types'
 import { v4 as uuidv4 } from 'uuid'
+import { 
+  authMiddleware, 
+  requireRole, 
+  authenticateUser, 
+  generateToken, 
+  AuthenticatedRequest,
+  changeUserPassword,
+  createUser
+} from './auth'
+import { 
+  rateLimitMiddleware,
+  validateBody,
+  validateQuery,
+  sanitizeBody,
+  requireContentType,
+  ValidationSchema
+} from './middleware'
 
 dotenv.config()
 
 const app = express()
 const PORT = process.env.PORT || 8080
 
-// Middleware
+// Middleware setup
 app.use(cors())
-app.use(express.json())
+app.use(express.json({ limit: '10mb' }))
+
+// Rate limiting middleware (100 requests per 15 minutes)
+app.use(rateLimitMiddleware({
+  windowMs: 15 * 60 * 1000,
+  maxRequests: 100,
+  perEndpoint: false,
+}))
 
 // Request logging
 app.use((req: Request, res: Response, next: NextFunction) => {
@@ -33,8 +57,103 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 // Initialize database
 initializeDatabase()
 
+// ============================================================================
+// Authentication Endpoints
+// ============================================================================
+
+// Login endpoint
+app.post('/auth/login', 
+  requireContentType(['application/json']),
+  validateBody({
+    username: { type: 'string', required: true, min: 1 },
+    password: { type: 'string', required: true, min: 1 },
+  }),
+  (req: Request, res: Response) => {
+    try {
+      const { username, password } = req.body
+
+      const result = authenticateUser(username, password)
+      if (!result) {
+        return res.status(401).json({
+          error: 'Unauthorized',
+          message: 'Invalid username or password',
+        })
+      }
+
+      ActivityRepository.create({
+        type: 'auth',
+        resourceType: 'user',
+        resourceId: username,
+        description: `User '${username}' logged in`,
+      })
+
+      res.json({
+        token: result.token,
+        user: result.user,
+      })
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to login' })
+    }
+  }
+)
+
+// Change password endpoint
+app.post('/auth/change-password',
+  authMiddleware as any,
+  requireContentType(['application/json']),
+  validateBody({
+    oldPassword: { type: 'string', required: true, min: 1 },
+    newPassword: { type: 'string', required: true, min: 8 },
+  }),
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      const { oldPassword, newPassword } = req.body
+      const username = req.user?.username
+
+      if (!username) {
+        return res.status(401).json({ error: 'Unauthorized' })
+      }
+
+      const success = changeUserPassword(username, oldPassword, newPassword)
+      if (!success) {
+        return res.status(400).json({
+          error: 'Bad Request',
+          message: 'Current password is incorrect',
+        })
+      }
+
+      ActivityRepository.create({
+        type: 'auth',
+        resourceType: 'user',
+        resourceId: username,
+        description: `User '${username}' changed password`,
+      })
+
+      res.json({ message: 'Password changed successfully' })
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to change password' })
+    }
+  }
+)
+
+// Verify token endpoint
+app.get('/auth/verify', authMiddleware as any, (req: AuthenticatedRequest, res: Response) => {
+  try {
+    res.json({
+      user: req.user,
+      token: req.token,
+    })
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to verify token' })
+  }
+})
+
+// ============================================================================
+// Protected API Endpoints (require authentication)
+// ============================================================================
+
 // Cluster API
-app.get('/api/cluster/info', (req: Request, res: Response) => {
+app.get('/api/cluster/info', authMiddleware as any, (req: AuthenticatedRequest, res: Response) => {
   try {
     res.json({
       version: '1.27.0',
@@ -49,7 +168,7 @@ app.get('/api/cluster/info', (req: Request, res: Response) => {
 })
 
 // Projects API
-app.get('/api/projects', (req: Request, res: Response) => {
+app.get('/api/projects', authMiddleware as any, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { status } = req.query
     const projects = ProjectRepository.findAll(status as string | undefined)
@@ -59,7 +178,7 @@ app.get('/api/projects', (req: Request, res: Response) => {
   }
 })
 
-app.post('/api/projects', (req: Request, res: Response) => {
+app.post('/api/projects', authMiddleware as any, requireRole('admin', 'user') as any, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { name, description, owner } = req.body
 
@@ -87,7 +206,7 @@ app.post('/api/projects', (req: Request, res: Response) => {
   }
 })
 
-app.get('/api/projects/:id', (req: Request, res: Response) => {
+app.get('/api/projects/:id', authMiddleware as any, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
     const project = ProjectRepository.findById(id)
@@ -116,7 +235,7 @@ app.get('/api/projects/:id', (req: Request, res: Response) => {
   }
 })
 
-app.put('/api/projects/:id', (req: Request, res: Response) => {
+app.put('/api/projects/:id', authMiddleware as any, requireRole('admin', 'user') as any, (req: AuthenticatedRequest, res: Response) => {
   try {
     const { id } = req.params
     const { name, description, status } = req.body
