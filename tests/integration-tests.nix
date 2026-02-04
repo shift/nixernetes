@@ -5,6 +5,7 @@
 # - Module interactions
 # - YAML output generation
 # - Policy correctness
+# - Cost analysis calculations
 
 { lib, pkgs, ... }:
 
@@ -22,6 +23,7 @@ let
   output = import ../src/lib/output.nix { inherit lib pkgs; };
   types_module = import ../src/lib/types.nix { inherit lib; };
   generators = import ../src/lib/generators.nix { inherit lib pkgs; };
+  costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -269,6 +271,167 @@ in
         (result ? prod) &&
         (builtins.length result.dev > 0) &&
         (builtins.length result.prod > 0);
+    expected = true;
+  };
+
+  # Test 13: Cost analysis module loads and calculates correctly
+  testCostAnalysisModule = {
+    name = "cost analysis module";
+    test =
+      let
+        # Test container cost calculation
+        containerCost = costAnalysis.mkContainerCost {
+          resources = {
+            requests = {
+              cpu = "500m";
+              memory = "512Mi";
+            };
+          };
+          provider = "aws";
+        };
+        # 0.5 CPU × 0.0535 + 0.5 GB × 0.0108 = 0.03215/hour
+        expectedHourly = 0.03215;
+        isClose = builtins.abs (containerCost - expectedHourly) < 0.001;
+      in
+        isClose;
+    expected = true;
+  };
+
+  # Test 14: Cost analysis for deployment
+  testDeploymentCostCalculation = {
+    name = "deployment cost calculation";
+    test =
+      let
+        deployment = {
+          spec = {
+            replicas = 3;
+            template.spec = {
+              containers = [
+                {
+                  name = "app";
+                  resources = {
+                    requests = {
+                      cpu = "100m";
+                      memory = "128Mi";
+                    };
+                  };
+                }
+              ];
+            };
+          };
+        };
+        cost = costAnalysis.mkDeploymentCost {
+          replicas = deployment.spec.replicas;
+          template = deployment.spec.template;
+          provider = "aws";
+        };
+      in
+        # Should have cost fields
+        (cost ? hourly) &&
+        (cost ? daily) &&
+        (cost ? monthly) &&
+        (cost ? annual) &&
+        (cost.hourly > 0) &&
+        (cost.daily == cost.hourly * 24) &&
+        (cost.monthly == cost.hourly * 24 * 30);
+    expected = true;
+  };
+
+  # Test 15: Multi-provider cost comparison
+  testMultiProviderComparison = {
+    name = "multi-provider cost comparison";
+    test =
+      let
+        deployments = {
+          app = {
+            spec = {
+              replicas = 1;
+              template.spec = {
+                containers = [
+                  {
+                    name = "web";
+                    resources = {
+                      requests = {
+                        cpu = "500m";
+                        memory = "512Mi";
+                      };
+                    };
+                  }
+                ];
+              };
+            };
+          };
+        };
+        awsSummary = costAnalysis.mkCostSummary {
+          inherit deployments;
+          provider = "aws";
+        };
+        azureSummary = costAnalysis.mkCostSummary {
+          inherit deployments;
+          provider = "azure";
+        };
+        gcpSummary = costAnalysis.mkCostSummary {
+          inherit deployments;
+          provider = "gcp";
+        };
+      in
+        # Azure should be cheaper than AWS
+        (azureSummary.total.monthly < awsSummary.total.monthly) &&
+        # GCP should be cheapest
+        (gcpSummary.total.monthly < azureSummary.total.monthly) &&
+        # All should have cost summary fields
+        (awsSummary ? total) &&
+        (awsSummary ? byDeployment) &&
+        (awsSummary.provider == "aws") &&
+        (azureSummary.provider == "azure") &&
+        (gcpSummary.provider == "gcp");
+    expected = true;
+  };
+
+  # Test 16: Cost recommendations generation
+  testCostRecommendations = {
+    name = "cost recommendations generation";
+    test =
+      let
+        deployments = {
+          oversized-app = {
+            spec.template.spec.containers = [
+              {
+                name = "app";
+                resources = {
+                  requests = {
+                    cpu = "4";  # Very high CPU request
+                    memory = "2Gi";
+                  };
+                  limits = {
+                    cpu = "4";
+                    memory = "2Gi";
+                  };
+                };
+              }
+              {
+                name = "sidecar";
+                resources = {
+                  requests = {
+                    cpu = "100m";
+                    memory = "128Mi";
+                  };
+                  # No limits specified
+                };
+              }
+            ];
+          };
+        };
+        recommendations = costAnalysis.mkCostRecommendations {
+          inherit deployments;
+        };
+      in
+        # Should find recommendations
+        (builtins.length recommendations > 0) &&
+        # Should detect CPU oversizing
+        (builtins.any (rec: rec.type == "cpu_oversizing") recommendations) &&
+        # Should detect missing limits
+        (builtins.any (rec: rec.type == "missing_limit") recommendations);
     expected = true;
   };
 }
