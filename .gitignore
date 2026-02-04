@@ -1,0 +1,32 @@
+# Nix build outputs
+result
+result-*
+.envrc.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Test outputs
+.pytest_cache/
+coverage/
+htmlcov/
+
+# Temporary files
+*.tmp
+.DS_Store
+
+# Generated outputs
+manifests/
+helm-charts/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
