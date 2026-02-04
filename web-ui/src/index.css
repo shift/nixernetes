@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply box-border;
+}
+
+body {
+  @apply font-sans antialiased bg-gray-50;
+}
+
+/* Custom button styles */
+.btn {
+  @apply px-4 py-2 rounded font-medium transition-colors;
+}
+
+.btn-primary {
+  @apply bg-nix-500 text-white hover:bg-nix-600;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 text-gray-900 hover:bg-gray-300;
+}
+
+.btn-danger {
+  @apply bg-red-500 text-white hover:bg-red-600;
+}
+
+/* Form styles */
+.form-input {
+  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-nix-500;
+}
+
+.form-label {
+  @apply block text-sm font-medium text-gray-700 mb-1;
+}
+
+.form-group {
+  @apply mb-4;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-lg shadow border border-gray-200;
+}
+
+.card-header {
+  @apply px-6 py-4 border-b border-gray-200;
+}
+
+.card-body {
+  @apply px-6 py-4;
+}
+
+/* Animations */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+/* Code editor styles */
+.monaco-editor {
+  @apply border border-gray-300 rounded;
+}
+
+/* Table styles */
+.table {
+  @apply w-full border-collapse;
+}
+
+.table thead {
+  @apply bg-gray-100;
+}
+
+.table th {
+  @apply px-6 py-3 text-left text-sm font-semibold text-gray-700;
+}
+
+.table td {
+  @apply px-6 py-4 border-b border-gray-200 text-sm;
+}
+
+.table tbody tr:hover {
+  @apply bg-gray-50;
+}
