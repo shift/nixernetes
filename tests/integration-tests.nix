@@ -35,10 +35,11 @@ let
         advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
         disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
         multiTenancy = import ../src/lib/multi-tenancy.nix { inherit lib; };
-        serviceMesh = import ../src/lib/service-mesh.nix { inherit lib; };
-        apiGateway = import ../src/lib/api-gateway.nix { inherit lib; };
-        containerRegistry = import ../src/lib/container-registry.nix { inherit lib; };
- 
+         serviceMesh = import ../src/lib/service-mesh.nix { inherit lib; };
+         apiGateway = import ../src/lib/api-gateway.nix { inherit lib; };
+         containerRegistry = import ../src/lib/container-registry.nix { inherit lib; };
+         mlOperations = import ../src/lib/ml-operations.nix { inherit lib; };
+  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
     let
@@ -3083,6 +3084,185 @@ in
             (builtins.elem "1.26" framework.supportedK8sVersions) &&
             (builtins.elem "1.31" framework.supportedK8sVersions) &&
             (framework.maturity == "stable");
+        expected = true;
+      };
+
+      # Test 127: ML Operations - Kubeflow Pipelines Configuration
+      testMLOpsKubeflowPipelines = {
+        name = "ml operations kubeflow pipelines";
+        test =
+          let
+            config = mlOperations.mkKubeflowPipelines {
+              name = "test-pipelines";
+              namespace = "kubeflow";
+              storage = {
+                backend = "minio";
+                bucket = "kubeflow-artifacts";
+              };
+            };
+          in
+            # Should create valid Kubeflow configuration
+            (config.apiVersion == "v1") &&
+            (config.kind == "Namespace") &&
+            (config.metadata.name == "kubeflow") &&
+            (config.metadata.labels ? "nixernetes.io/framework") &&
+            (config.metadata.labels."nixernetes.io/framework" == "ml-operations");
+        expected = true;
+      };
+
+      # Test 128: ML Operations - Seldon Core Model Serving
+      testMLOpsSeldonCore = {
+        name = "ml operations seldon core";
+        test =
+          let
+            config = mlOperations.mkSeldonCore {
+              name = "iris-model";
+              namespace = "seldon";
+              models = [
+                {
+                  name = "classifier";
+                  type = "sklearn";
+                }
+              ];
+              replicas = 3;
+            };
+          in
+            # Should create valid Seldon deployment
+            (config.apiVersion == "machinelearning.seldon.io/v1") &&
+            (config.kind == "SeldonDeployment") &&
+            (config.metadata.name == "iris-model") &&
+            (config.metadata.namespace == "seldon") &&
+            (config.spec.replicas == 3) &&
+            (config.metadata.labels ? "nixernetes.io/ml-framework");
+        expected = true;
+      };
+
+      # Test 129: ML Operations - MLflow Tracking
+      testMLOpsMLflowTracking = {
+        name = "ml operations mlflow tracking";
+        test =
+          let
+            config = mlOperations.mkMLflowTracking {
+              namespace = "mlflow";
+              trackingUri = "http://mlflow.mlflow.svc:5000";
+            };
+          in
+            # Should create valid MLflow configuration
+            (config.kind == "ConfigMap") &&
+            (config.metadata.namespace == "mlflow") &&
+            (config.data ? "MLFLOW_TRACKING_URI") &&
+            (config.data.MLFLOW_TRACKING_URI == "http://mlflow.mlflow.svc:5000") &&
+            (config.metadata.labels ? "nixernetes.io/ml-framework");
+        expected = true;
+      };
+
+      # Test 130: ML Operations - KServe Inference Services
+      testMLOpsKServeInference = {
+        name = "ml operations kserve inference";
+        test =
+          let
+            config = mlOperations.mkKServeInference {
+              name = "iris-predictor";
+              namespace = "kserve";
+              predictor = {
+                spec = {
+                  containers = [];
+                };
+              };
+            };
+          in
+            # Should create valid KServe configuration
+            (config.apiVersion == "serving.kserve.io/v1beta1") &&
+            (config.kind == "InferenceService") &&
+            (config.metadata.name == "iris-predictor") &&
+            (config.metadata.namespace == "kserve") &&
+            (config.metadata.labels ? "nixernetes.io/serving-type");
+        expected = true;
+      };
+
+      # Test 131: ML Operations - Feature Store
+      testMLOpsFeatureStore = {
+        name = "ml operations feature store";
+        test =
+          let
+            config = mlOperations.mkFeatureStore {
+              name = "online-features";
+              namespace = "feature-store";
+              type = "both";
+            };
+          in
+            # Should create valid feature store configuration
+            (config.kind == "ConfigMap") &&
+            (config.metadata.name == "online-features-config") &&
+            (config.metadata.namespace == "feature-store") &&
+            (config.data ? "FEATURE_STORE_TYPE") &&
+            (config.data.FEATURE_STORE_TYPE == "both");
+        expected = true;
+      };
+
+      # Test 132: ML Operations - Distributed Training
+      testMLOpsDistributedTraining = {
+        name = "ml operations distributed training";
+        test =
+          let
+            config = mlOperations.mkDistributedTraining {
+              name = "pytorch-training";
+              namespace = "ml-training";
+              framework = "pytorch";
+              workers = 4;
+            };
+          in
+            # Should create valid distributed training configuration
+            (config.kind == "ConfigMap") &&
+            (config.metadata.namespace == "ml-training") &&
+            (config.data ? "FRAMEWORK") &&
+            (config.data.FRAMEWORK == "pytorch") &&
+            (config.data ? "NUM_WORKERS") &&
+            (config.data.NUM_WORKERS == "4");
+        expected = true;
+      };
+
+      # Test 133: ML Operations - AutoML Pipeline
+      testMLOpsAutoML = {
+        name = "ml operations automl pipeline";
+        test =
+          let
+            config = mlOperations.mkAutoML {
+              name = "classification-search";
+              namespace = "automl";
+              objective = "classification";
+              timeLimit = 3600;
+            };
+          in
+            # Should create valid AutoML configuration
+            (config.kind == "ConfigMap") &&
+            (config.metadata.namespace == "automl") &&
+            (config.data ? "OBJECTIVE") &&
+            (config.data.OBJECTIVE == "classification") &&
+            (config.data ? "TIME_LIMIT") &&
+            (config.data.TIME_LIMIT == "3600");
+        expected = true;
+      };
+
+      # Test 134: ML Operations - Framework Information
+      testMLOpsFrameworkInfo = {
+        name = "ml operations framework information";
+        test =
+          let
+            framework = mlOperations.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "ml-operations") &&
+            (framework.version == "1.0.0") &&
+            (builtins.elem "Kubeflow pipelines and components" framework.features) &&
+            (builtins.elem "Seldon Core model serving" framework.features) &&
+            (builtins.elem "MLflow experiment tracking" framework.features) &&
+            (builtins.elem "KServe inference services" framework.features) &&
+            (builtins.elem "Model training orchestration" framework.features) &&
+            (builtins.elem "Model monitoring and drift detection" framework.features) &&
+            (builtins.elem "Feature store integration" framework.features) &&
+            (builtins.elem "AutoML capabilities" framework.features) &&
+            (builtins.elem "Jupyter notebook management" framework.features);
         expected = true;
       };
 
