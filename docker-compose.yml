@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/src:/app/backend/src
+      - ./backend/node_modules:/app/backend/node_modules
+    environment:
+      - NODE_ENV=development
+      - PORT=8080
+      - DB_PATH=/app/data/nixernetes.db
+    depends_on:
+      - data
+    command: npm run dev
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+      target: frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./web-ui/src:/app/web-ui/src
+      - ./web-ui/public:/app/web-ui/public
+      - ./web-ui/node_modules:/app/web-ui/node_modules
+    environment:
+      - VITE_API_URL=http://localhost:8080
+    command: npm run dev
+
+  data:
+    image: busybox:latest
+    volumes:
+      - nixernetes-data:/app/data
+    command: tail -f /dev/null
+
+volumes:
+  nixernetes-data:
+
+networks:
+  default:
+    name: nixernetes

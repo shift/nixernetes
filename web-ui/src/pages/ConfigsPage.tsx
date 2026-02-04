@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@stores/appStore'
 import { getApi } from '@services/api'
+import ManifestEditor from '@components/ManifestEditor'
+import { validateManifest, type ValidationResult } from '@utils/manifestValidation'
 
 interface Config {
   id: string
@@ -28,7 +30,7 @@ export default function ConfigsPage() {
   return (
     <Routes>
       <Route path="/" element={<ConfigsList />} />
-      <Route path="/:id" element={<ConfigDetail />} />
+      <Route path="/:id" element={<ConfigDetailView />} />
       <Route path="/create/:kind" element={<ConfigForm />} />
     </Routes>
   )
@@ -183,12 +185,13 @@ function ConfigsList() {
   )
 }
 
-function ConfigDetail() {
+function ConfigDetailView() {
   const [config, setConfig] = useState<ConfigDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [isEditing, setIsEditing] = useState(false)
-  const [editData, setEditData] = useState<Record<string, string>>({})
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
   const setError = useAppStore((state) => state.setError)
+  const navigate = useNavigate()
 
   useEffect(() => {
     loadConfig()
@@ -200,12 +203,20 @@ function ConfigDetail() {
       const api = getApi()
       const res = await api.get('/api/configs/default/my-config')
       setConfig(res.data)
-      setEditData(res.data?.data || {})
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load config')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleValidate = (result: ValidationResult) => {
+    setValidation(result)
+  }
+
+  const handleSave = (manifest: any) => {
+    // Save the manifest via API
+    setIsEditing(false)
   }
 
   if (loading || !config) {
@@ -225,37 +236,36 @@ function ConfigDetail() {
             {config.namespace}/{config.kind}
           </p>
         </div>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="px-4 py-2 bg-nix-500 text-white rounded-lg hover:bg-nix-600 transition"
-        >
-          {isEditing ? 'Cancel' : 'Edit'}
-        </button>
+        <div className="space-x-2">
+          <button
+            onClick={() => navigate('/configs')}
+            className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition"
+          >
+            Back
+          </button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Data</h2>
-            {isEditing ? (
-              <div className="space-y-3">
-                {Object.entries(editData).map(([key, value]) => (
-                  <div key={key}>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      {key}
-                    </label>
-                    <textarea
-                      value={value}
-                      onChange={(e) =>
-                        setEditData({ ...editData, [key]: e.target.value })
-                      }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-nix-500 focus:border-nix-500"
-                      rows={3}
-                    />
-                  </div>
-                ))}
-              </div>
-            ) : (
+      {isEditing ? (
+        <ManifestEditor
+          initialManifest={{
+            kind: config.kind,
+            apiVersion: 'v1',
+            metadata: {
+              name: config.name,
+              namespace: config.namespace,
+            },
+            data: config.data,
+          }}
+          onSave={handleSave}
+          onValidate={handleValidate}
+          showValidation={true}
+        />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Data</h2>
               <div className="space-y-3">
                 {Object.entries(config.data).map(([key, value]) => (
                   <div key={key} className="border-b border-gray-200 pb-3 last:border-b-0">
@@ -266,62 +276,68 @@ function ConfigDetail() {
                   </div>
                 ))}
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        <div className="space-y-4">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-sm font-semibold text-gray-900 mb-3">Information</h3>
-            <div className="space-y-2 text-sm">
-              <div>
-                <p className="text-gray-600">Kind</p>
-                <p className="font-medium text-gray-900">{config.kind}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Namespace</p>
-                <p className="font-medium text-gray-900">{config.namespace}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Created</p>
-                <p className="font-medium text-gray-900">
-                  {new Date(config.created).toLocaleDateString()}
-                </p>
-              </div>
-              <div>
-                <p className="text-gray-600">Updated</p>
-                <p className="font-medium text-gray-900">
-                  {new Date(config.updated).toLocaleDateString()}
-                </p>
-              </div>
-              {config.owner && (
+          <div className="space-y-4">
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-sm font-semibold text-gray-900 mb-3">Information</h3>
+              <div className="space-y-2 text-sm">
                 <div>
-                  <p className="text-gray-600">Owner</p>
-                  <p className="font-medium text-gray-900">{config.owner}</p>
+                  <p className="text-gray-600">Kind</p>
+                  <p className="font-medium text-gray-900">{config.kind}</p>
                 </div>
-              )}
+                <div>
+                  <p className="text-gray-600">Namespace</p>
+                  <p className="font-medium text-gray-900">{config.namespace}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Created</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(config.created).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Updated</p>
+                  <p className="font-medium text-gray-900">
+                    {new Date(config.updated).toLocaleDateString()}
+                  </p>
+                </div>
+                {config.owner && (
+                  <div>
+                    <p className="text-gray-600">Owner</p>
+                    <p className="font-medium text-gray-900">{config.owner}</p>
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => setIsEditing(true)}
+                className="w-full mt-4 px-4 py-2 bg-nix-500 text-white rounded-lg hover:bg-nix-600 transition"
+              >
+                Edit
+              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }
 
 function ConfigForm() {
-  const [formData, setFormData] = useState<Record<string, string>>({
-    name: '',
-    namespace: 'default',
-    data: '',
-  })
+  const [manifest, setManifest] = useState<any>({})
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
   const navigate = useNavigate()
   const setError = useAppStore((state) => state.setError)
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  const handleValidate = (result: ValidationResult) => {
+    setValidation(result)
+  }
+
+  const handleSave = async (manifest: any) => {
     try {
       const api = getApi()
-      await api.post('/api/configs', formData)
+      await api.post('/api/configs', manifest)
       navigate('/configs')
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to create config')
@@ -329,61 +345,23 @@ function ConfigForm() {
   }
 
   return (
-    <div className="max-w-2xl">
+    <div className="max-w-4xl">
       <h1 className="text-3xl font-bold text-gray-900 mb-6">Create Configuration</h1>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Name</label>
-          <input
-            type="text"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            required
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-nix-500 focus:border-nix-500"
-          />
-        </div>
+      <ManifestEditor
+        onValidate={handleValidate}
+        onSave={handleSave}
+        showValidation={true}
+      />
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Namespace</label>
-          <select
-            value={formData.namespace}
-            onChange={(e) => setFormData({ ...formData, namespace: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-nix-500 focus:border-nix-500"
-          >
-            <option value="default">default</option>
-            <option value="kube-system">kube-system</option>
-            <option value="kube-public">kube-public</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">Data</label>
-          <textarea
-            value={formData.data}
-            onChange={(e) => setFormData({ ...formData, data: e.target.value })}
-            placeholder="YAML or JSON format"
-            rows={10}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-nix-500 focus:border-nix-500"
-          />
-        </div>
-
-        <div className="flex space-x-3">
-          <button
-            type="submit"
-            className="px-4 py-2 bg-nix-500 text-white rounded-lg hover:bg-nix-600 transition"
-          >
-            Create
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/configs')}
-            className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+      <div className="mt-4">
+        <button
+          onClick={() => navigate('/configs')}
+          className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition"
+        >
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }

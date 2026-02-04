@@ -2,6 +2,9 @@ import React, { useEffect, useState } from 'react'
 import { Routes, Route, useNavigate } from 'react-router-dom'
 import { useAppStore } from '@stores/appStore'
 import { getApi } from '@services/api'
+import ManifestEditor from '@components/ManifestEditor'
+import ManifestPreview from '@components/ManifestPreview'
+import { validateManifest, type ValidationResult } from '@utils/manifestValidation'
 
 interface Project {
   id: string
@@ -30,6 +33,7 @@ export default function ProjectsPage() {
     <Routes>
       <Route path="/" element={<ProjectsList />} />
       <Route path="/:id" element={<ProjectDetail />} />
+      <Route path="/:id/manifest/:manifestId/edit" element={<ManifestEditView />} />
     </Routes>
   )
 }
@@ -300,10 +304,15 @@ function ProjectDetail() {
                       {manifest.valid ? 'Valid' : 'Invalid'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right text-sm space-x-2">
-                    <button className="text-nix-500 hover:text-nix-600">View</button>
-                    <button className="text-blue-500 hover:text-blue-600">Edit</button>
-                  </td>
+                   <td className="px-6 py-4 text-right text-sm space-x-2">
+                     <button className="text-nix-500 hover:text-nix-600">View</button>
+                     <button
+                       onClick={() => navigate(`/projects/${project.id}/manifest/${manifest.id}/edit`)}
+                       className="text-blue-500 hover:text-blue-600"
+                     >
+                       Edit
+                     </button>
+                   </td>
                 </tr>
               ))}
             </tbody>
@@ -354,5 +363,92 @@ function StatusBadge({ status }: StatusBadgeProps) {
     <span className={`px-3 py-1 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
       {config.label}
     </span>
+  )
+}
+
+function ManifestEditView() {
+  const [manifest, setManifest] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [validation, setValidation] = useState<ValidationResult | null>(null)
+  const navigate = useNavigate()
+  const setError = useAppStore((state) => state.setError)
+
+  useEffect(() => {
+    loadManifest()
+  }, [])
+
+  async function loadManifest() {
+    try {
+      setLoading(true)
+      // In a real app, fetch from API using params from route
+      // For now, use a mock manifest
+      setManifest({
+        kind: 'ConfigMap',
+        apiVersion: 'v1',
+        metadata: {
+          name: 'example-manifest',
+          namespace: 'default',
+        },
+        data: {
+          key: 'value',
+        },
+      })
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to load manifest')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleValidate = (result: ValidationResult) => {
+    setValidation(result)
+  }
+
+  const handleSave = async (updatedManifest: any) => {
+    try {
+      // Save via API
+      const api = getApi()
+      await api.put('/api/projects/example/manifests/example-manifest', updatedManifest)
+      navigate('/projects/example-project')
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to save manifest')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-nix-500"></div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold text-gray-900">Edit Manifest</h1>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-gray-200 text-gray-900 rounded-lg hover:bg-gray-300 transition"
+        >
+          Back
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <ManifestEditor
+            initialManifest={manifest}
+            onSave={handleSave}
+            onValidate={handleValidate}
+            showValidation={true}
+          />
+        </div>
+
+        <div>
+          {manifest && <ManifestPreview manifest={manifest} onValidationChange={handleValidate} />}
+        </div>
+      </div>
+    </div>
   )
 }

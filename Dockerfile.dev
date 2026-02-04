@@ -1,0 +1,32 @@
+# Development Dockerfile for local development with docker-compose
+# Use as: docker-compose up
+
+# Backend development stage
+FROM node:20-alpine AS backend
+
+WORKDIR /app/backend
+
+COPY backend/package*.json ./
+RUN npm install
+
+COPY backend/tsconfig.json ./
+COPY backend/src ./src
+
+EXPOSE 8080
+
+# Frontend development stage
+FROM node:20-alpine AS frontend
+
+WORKDIR /app/web-ui
+
+COPY web-ui/package*.json ./
+RUN npm install
+
+COPY web-ui/tsconfig.json ./
+COPY web-ui/vite.config.ts ./
+COPY web-ui/tailwind.config.js ./
+COPY web-ui/index.html ./
+COPY web-ui/src ./src
+COPY web-ui/public ./public
+
+EXPOSE 5173
