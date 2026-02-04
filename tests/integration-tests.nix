@@ -31,8 +31,9 @@ let
     performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
      policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
-     helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
-     advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
+      helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
+      advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
+      disasterRecovery = import ../src/lib/disaster-recovery.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -434,13 +435,13 @@ in
         recommendations = costAnalysis.mkCostRecommendations {
           inherit deployments;
         };
-      in
-        # Should find recommendations
-        (builtins.length recommendations > 0) &&
-        # Should detect CPU oversizing
-        (builtins.any (rec: rec.type == "cpu_oversizing") recommendations) &&
-        # Should detect missing limits
-        (builtins.any (rec: rec.type == "missing_limit") recommendations);
+       in
+         # Should find recommendations
+         (builtins.length recommendations > 0) &&
+         # Should detect CPU oversizing
+         (builtins.any (r: r.type == "cpu_oversizing") recommendations) &&
+         # Should detect missing limits
+         (builtins.any (r: r.type == "missing_limit") recommendations);
     expected = true;
   };
 
@@ -1943,9 +1944,242 @@ in
            (builtins.elem "cost-optimized" framework.supportedStrategies) &&
            (builtins.elem "1.28" framework.supportedKubernetesVersions);
        expected = true;
-     };
+      };
+
+      # Test 79: Disaster Recovery - Backup Policy
+      testDisasterRecoveryBackupPolicy = {
+        name = "disaster recovery backup policy";
+        test =
+          let
+            policy = disasterRecovery.mkBackupPolicy "prod-backup" {
+              namespace = "production";
+              schedule = "0 2 * * *";
+              retention = 30;
+              backupType = "full";
+              storage = {
+                type = "s3";
+                bucket = "backups";
+                region = "us-east-1";
+                pathPrefix = "prod";
+              };
+              encryption = {
+                enabled = true;
+                algorithm = "AES-256";
+              };
+            };
+          in
+            # Should create valid backup policy
+            (policy.name == "prod-backup") &&
+            (policy.namespace == "production") &&
+            (policy.schedule == "0 2 * * *") &&
+            (policy.retention == 30) &&
+            (policy.backupType == "full") &&
+            (policy.storage.type == "s3") &&
+            (policy.encryption.enabled == true);
+        expected = true;
+      };
+
+      # Test 80: Disaster Recovery - Restore Strategy
+      testDisasterRecoveryRestoreStrategy = {
+        name = "disaster recovery restore strategy";
+        test =
+          let
+            strategy = disasterRecovery.mkRestoreStrategy "prod-backup-20240204" {
+              backupName = "prod-backup-20240204";
+              namespace = "production";
+              resources = {
+                deployments = ["app-*"];
+                statefulsets = ["db-*"];
+                persistentvolumes = true;
+              };
+              verifyAfterRestore = true;
+              skipOwnerReferences = false;
+            };
+          in
+            # Should create valid restore strategy
+            (strategy.backupName == "prod-backup-20240204") &&
+            (strategy.namespace == "production") &&
+            (builtins.length strategy.resources.deployments == 1) &&
+            (strategy.verifyAfterRestore == true) &&
+            (strategy.skipOwnerReferences == false);
+        expected = true;
+      };
+
+      # Test 81: Disaster Recovery - Failover Policy
+      testDisasterRecoveryFailoverPolicy = {
+        name = "disaster recovery failover policy";
+        test =
+          let
+            policy = disasterRecovery.mkFailoverPolicy "multi-region-failover" {
+              primaryCluster = "us-east-1-prod";
+              secondaryCluster = "us-west-2-standby";
+              clusters = {
+                "us-east-1-prod" = {
+                  region = "us-east-1";
+                  priority = 1;
+                  healthChecks = ["kube-apiserver" "etcd" "kubelet"];
+                };
+                "us-west-2-standby" = {
+                  region = "us-west-2";
+                  priority = 2;
+                  healthChecks = ["kube-apiserver" "etcd" "kubelet"];
+                };
+              };
+              failoverTrigger = {
+                unhealthyThreshold = 3;
+                checkInterval = "10s";
+                gracePeriod = "30s";
+              };
+              replicationMode = "sync";
+              rpo = 60;
+              rto = 300;
+            };
+            validation = disasterRecovery.validateFailoverPolicy policy;
+          in
+            # Should create valid failover policy and pass validation
+            (policy.name == "multi-region-failover") &&
+            (policy.primaryCluster == "us-east-1-prod") &&
+            (policy.secondaryCluster == "us-west-2-standby") &&
+            (policy.replicationMode == "sync") &&
+            (policy.rpo == 60) &&
+            (policy.rto == 300) &&
+            (validation.valid == true);
+        expected = true;
+      };
+
+      # Test 82: Disaster Recovery - RPO
+      testDisasterRecoveryRPO = {
+        name = "disaster recovery recovery point objective";
+        test =
+          let
+            rpo = disasterRecovery.mkRPO "prod-rpo" {
+              maxDataLoss = "15m";
+              dataLossTolerance = "acceptable";
+              backupFrequency = "5m";
+              verificationEnabled = true;
+            };
+          in
+            # Should create valid RPO
+            (rpo.name == "prod-rpo") &&
+            (rpo.maxDataLoss == "15m") &&
+            (rpo.dataLossTolerance == "acceptable") &&
+            (rpo.backupFrequency == "5m") &&
+            (rpo.verificationEnabled == true);
+        expected = true;
+      };
+
+      # Test 83: Disaster Recovery - RTO
+      testDisasterRecoveryRTO = {
+        name = "disaster recovery recovery time objective";
+        test =
+          let
+            rto = disasterRecovery.mkRTO "prod-rto" {
+              maxRecoveryTime = "30m";
+              recoveryTimeTolerance = "critical";
+              testingFrequency = "monthly";
+              escalationContacts = ["team@example.com"];
+            };
+          in
+            # Should create valid RTO
+            (rto.name == "prod-rto") &&
+            (rto.maxRecoveryTime == "30m") &&
+            (rto.recoveryTimeTolerance == "critical") &&
+            (rto.testingFrequency == "monthly") &&
+            (builtins.length rto.escalationContacts == 1);
+        expected = true;
+      };
+
+      # Test 84: Disaster Recovery - Plan
+      testDisasterRecoveryPlan = {
+        name = "disaster recovery comprehensive plan";
+        test =
+          let
+            plan = disasterRecovery.mkDisasterRecoveryPlan "prod-dr-plan" {
+              criticality = "critical";
+              rpo = 60;
+              rto = 300;
+              backupStrategy = {
+                frequency = "daily";
+                retention = 30;
+                locations = ["us-east-1" "us-west-2"];
+              };
+              failoverStrategy = {
+                type = "active-passive";
+                failoverTime = "5m";
+                testingSchedule = "monthly";
+              };
+              procedures = [
+                {
+                  name = "initial-assessment";
+                  steps = ["assess-damage" "identify-affected-services"];
+                  estimatedTime = "15m";
+                }
+                {
+                  name = "activation";
+                  steps = ["trigger-failover" "verify-services"];
+                  estimatedTime = "10m";
+                }
+              ];
+            };
+            validation = disasterRecovery.validateDisasterRecoveryPlan plan;
+          in
+            # Should create valid DR plan and pass validation
+            (plan.name == "prod-dr-plan") &&
+            (plan.criticality == "critical") &&
+            (plan.rpo == 60) &&
+            (plan.rto == 300) &&
+            (builtins.length plan.procedures == 2) &&
+            (validation.valid == true);
+        expected = true;
+      };
+
+      # Test 85: Disaster Recovery - Data Replication
+      testDisasterRecoveryDataReplication = {
+        name = "disaster recovery data replication";
+        test =
+          let
+            replication = disasterRecovery.mkDataReplication "prod-replication" {
+              sourceCluster = "us-east-1-prod";
+              targetCluster = "us-west-2-standby";
+              replicationMode = "sync";
+              syncBandwidth = "100Mbps";
+              conflictResolution = "last-write-wins";
+              selectedNamespaces = ["production" "monitoring"];
+              excludeResources = ["Events" "Logs"];
+            };
+          in
+            # Should create valid data replication
+            (replication.name == "prod-replication") &&
+            (replication.sourceCluster == "us-east-1-prod") &&
+            (replication.targetCluster == "us-west-2-standby") &&
+            (replication.replicationMode == "sync") &&
+            (replication.syncBandwidth == "100Mbps") &&
+            (replication.conflictResolution == "last-write-wins") &&
+            (builtins.length replication.selectedNamespaces == 2);
+        expected = true;
+      };
+
+      # Test 86: Disaster Recovery - Framework Information
+      testDisasterRecoveryFrameworkInfo = {
+        name = "disaster recovery framework information";
+        test =
+          let
+            framework = disasterRecovery.framework;
+          in
+            # Should provide framework metadata
+            (framework.name == "Nixernetes Disaster Recovery") &&
+            (framework.version == "1.0.0") &&
+            (framework.features ? "backup-policies") &&
+            (framework.features ? "restore-strategies") &&
+            (framework.features ? "failover-policies") &&
+            (framework.features ? "rpo-rto-tracking") &&
+            (framework.features ? "dr-planning") &&
+            (framework.features ? "data-replication") &&
+            (framework.features ? "chaos-testing") &&
+            (framework.features ? "recovery-runbooks") &&
+            (builtins.elem "velero" framework.supportedBackupSystems) &&
+            (builtins.elem "s3" framework.supportedStorageBackends);
+        expected = true;
+      };
 
 }
-
-
-

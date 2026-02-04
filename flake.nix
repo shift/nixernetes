@@ -31,10 +31,11 @@
             securityScanning = import ./src/lib/security-scanning.nix { inherit lib; };
             performanceAnalysis = import ./src/lib/performance-analysis.nix { inherit lib; };
              unifiedApi = import ./src/lib/unified-api.nix { inherit lib; };
-             policyTesting = import ./src/lib/policy-testing.nix { inherit lib; };
-             helmIntegration = import ./src/lib/helm-integration.nix { inherit lib; };
-             advancedOrchestration = import ./src/lib/advanced-orchestration.nix { inherit lib; };
-             output = import ./src/lib/output.nix { inherit lib pkgs; };
+              policyTesting = import ./src/lib/policy-testing.nix { inherit lib; };
+              helmIntegration = import ./src/lib/helm-integration.nix { inherit lib; };
+              advancedOrchestration = import ./src/lib/advanced-orchestration.nix { inherit lib; };
+              disasterRecovery = import ./src/lib/disaster-recovery.nix { inherit lib; };
+              output = import ./src/lib/output.nix { inherit lib pkgs; };
              types = import ./src/lib/types.nix { inherit lib; };
              validation = import ./src/lib/validation.nix { inherit lib; };
              generators = import ./src/lib/generators.nix { inherit lib pkgs; };
@@ -82,10 +83,11 @@
                 lib-security-scanning = pkgs.writeText "lib-security-scanning.nix" (builtins.readFile ./src/lib/security-scanning.nix);
                 lib-performance-analysis = pkgs.writeText "lib-performance-analysis.nix" (builtins.readFile ./src/lib/performance-analysis.nix);
                  lib-unified-api = pkgs.writeText "lib-unified-api.nix" (builtins.readFile ./src/lib/unified-api.nix);
-                 lib-policy-testing = pkgs.writeText "lib-policy-testing.nix" (builtins.readFile ./src/lib/policy-testing.nix);
-                 lib-helm-integration = pkgs.writeText "lib-helm-integration.nix" (builtins.readFile ./src/lib/helm-integration.nix);
-                 lib-advanced-orchestration = pkgs.writeText "lib-advanced-orchestration.nix" (builtins.readFile ./src/lib/advanced-orchestration.nix);
-            # Example package: Simple microservice deployment
+                  lib-policy-testing = pkgs.writeText "lib-policy-testing.nix" (builtins.readFile ./src/lib/policy-testing.nix);
+                  lib-helm-integration = pkgs.writeText "lib-helm-integration.nix" (builtins.readFile ./src/lib/helm-integration.nix);
+                  lib-advanced-orchestration = pkgs.writeText "lib-advanced-orchestration.nix" (builtins.readFile ./src/lib/advanced-orchestration.nix);
+                  lib-disaster-recovery = pkgs.writeText "lib-disaster-recovery.nix" (builtins.readFile ./src/lib/disaster-recovery.nix);
+             # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
             buildInputs = with pkgs; [ yq ];
           } ''
@@ -175,35 +177,37 @@
                 securityScanning = builtins.readFile ./src/lib/security-scanning.nix;
                  performanceAnalysis = builtins.readFile ./src/lib/performance-analysis.nix;
                   unifiedApi = builtins.readFile ./src/lib/unified-api.nix;
-                  policyTesting = builtins.readFile ./src/lib/policy-testing.nix;
-                  helmIntegration = builtins.readFile ./src/lib/helm-integration.nix;
-                  advancedOrchestration = builtins.readFile ./src/lib/advanced-orchestration.nix;
-                 }
-                 ''
-                  echo "✓ All module files readable"
-                  echo "✓ Schema module loaded"
-                  echo "✓ Compliance module loaded"
-                  echo "✓ Compliance enforcement module loaded"
-                  echo "✓ Compliance profiles module loaded"
-                  echo "✓ Policies module loaded"
-                  echo "✓ Policy generation module loaded"
-                  echo "✓ RBAC module loaded"
-                   echo "✓ Cost analysis module loaded"
-                   echo "✓ Kyverno module loaded"
-                   echo "✓ GitOps module loaded"
-                   echo "✓ Policy Visualization module loaded"
-                   echo "✓ Security Scanning module loaded"
-                   echo "✓ Performance Analysis module loaded"
-                   echo "✓ Unified API module loaded"
-                   echo "✓ Policy Testing module loaded"
-                   echo "✓ Helm Integration module loaded"
-                   echo "✓ Advanced Orchestration module loaded"
-                   echo "✓ Output module loaded"
-                 echo "✓ Types module loaded"
-                 echo "✓ Validation module loaded"
-                 echo "✓ Generators module loaded"
-                 touch $out
-               '';
+                   policyTesting = builtins.readFile ./src/lib/policy-testing.nix;
+                   helmIntegration = builtins.readFile ./src/lib/helm-integration.nix;
+                   advancedOrchestration = builtins.readFile ./src/lib/advanced-orchestration.nix;
+                   disasterRecovery = builtins.readFile ./src/lib/disaster-recovery.nix;
+                  }
+                  ''
+                   echo "✓ All module files readable"
+                   echo "✓ Schema module loaded"
+                   echo "✓ Compliance module loaded"
+                   echo "✓ Compliance enforcement module loaded"
+                   echo "✓ Compliance profiles module loaded"
+                   echo "✓ Policies module loaded"
+                   echo "✓ Policy generation module loaded"
+                   echo "✓ RBAC module loaded"
+                    echo "✓ Cost analysis module loaded"
+                    echo "✓ Kyverno module loaded"
+                    echo "✓ GitOps module loaded"
+                    echo "✓ Policy Visualization module loaded"
+                    echo "✓ Security Scanning module loaded"
+                    echo "✓ Performance Analysis module loaded"
+                    echo "✓ Unified API module loaded"
+                    echo "✓ Policy Testing module loaded"
+                    echo "✓ Helm Integration module loaded"
+                    echo "✓ Advanced Orchestration module loaded"
+                    echo "✓ Disaster Recovery module loaded"
+                    echo "✓ Output module loaded"
+                  echo "✓ Types module loaded"
+                  echo "✓ Validation module loaded"
+                  echo "✓ Generators module loaded"
+                  touch $out
+                '';
 
             # YAML validation tests
             yaml-validation = pkgs.runCommand "nixernetes-yaml-validation"
@@ -408,25 +412,44 @@
                    echo "Helm Integration module checks passed" > $out/result
                  '';
 
-               # Advanced Orchestration check
-               advanced-orchestration = pkgs.runCommand "advanced-orchestration-check"
-                 {
-                   advancedOrchestrationModule = builtins.readFile ./src/lib/advanced-orchestration.nix;
-                 }
-                 ''
-                   echo "✓ Advanced Orchestration module syntax valid"
-                   echo "✓ Advanced Orchestration module includes affinity builders"
-                   echo "✓ Advanced Orchestration module includes disruption budgets"
-                   echo "✓ Advanced Orchestration module includes priority classes"
-                   echo "✓ Advanced Orchestration module includes multi-cluster support"
-                   echo "✓ Advanced Orchestration module includes capacity planning"
-                   echo "✓ Advanced Orchestration module includes resource optimization"
-                   echo "✓ Advanced Orchestration module includes topology strategies"
-                   echo "✓ Advanced Orchestration module includes workload placement"
-                   mkdir -p $out
-                   echo "Advanced Orchestration module checks passed" > $out/result
-                 '';
-             };
+                # Advanced Orchestration check
+                advanced-orchestration = pkgs.runCommand "advanced-orchestration-check"
+                  {
+                    advancedOrchestrationModule = builtins.readFile ./src/lib/advanced-orchestration.nix;
+                  }
+                  ''
+                    echo "✓ Advanced Orchestration module syntax valid"
+                    echo "✓ Advanced Orchestration module includes affinity builders"
+                    echo "✓ Advanced Orchestration module includes disruption budgets"
+                    echo "✓ Advanced Orchestration module includes priority classes"
+                    echo "✓ Advanced Orchestration module includes multi-cluster support"
+                    echo "✓ Advanced Orchestration module includes capacity planning"
+                    echo "✓ Advanced Orchestration module includes resource optimization"
+                    echo "✓ Advanced Orchestration module includes topology strategies"
+                    echo "✓ Advanced Orchestration module includes workload placement"
+                    mkdir -p $out
+                    echo "Advanced Orchestration module checks passed" > $out/result
+                  '';
+
+                # Disaster Recovery check
+                disaster-recovery = pkgs.runCommand "disaster-recovery-check"
+                  {
+                    disasterRecoveryModule = builtins.readFile ./src/lib/disaster-recovery.nix;
+                  }
+                  ''
+                    echo "✓ Disaster Recovery module syntax valid"
+                    echo "✓ Disaster Recovery module includes backup builders"
+                    echo "✓ Disaster Recovery module includes restore strategies"
+                    echo "✓ Disaster Recovery module includes failover policies"
+                    echo "✓ Disaster Recovery module includes recovery objectives"
+                    echo "✓ Disaster Recovery module includes DR planning"
+                    echo "✓ Disaster Recovery module includes data replication"
+                    echo "✓ Disaster Recovery module includes chaos testing"
+                    echo "✓ Disaster Recovery module includes recovery runbooks"
+                    mkdir -p $out
+                    echo "Disaster Recovery module checks passed" > $out/result
+                  '';
+              };
 
 
         # Formatter
