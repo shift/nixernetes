@@ -1,0 +1,12 @@
+---
+blank_issues_enabled: false
+contact_links:
+  - name: Usage Questions
+    url: https://github.com/nixernetes/nixernetes/discussions
+    about: Ask for help using Nixernetes in Discussions
+  - name: Security Issues
+    url: https://github.com/nixernetes/nixernetes/security/advisories
+    about: Report security vulnerabilities privately
+  - name: Community Chat
+    url: https://nixos.zulipchat.com/#narrow/stream/385359-nixernetes
+    about: Chat with the community on Zulip

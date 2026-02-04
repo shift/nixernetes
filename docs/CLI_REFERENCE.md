@@ -421,16 +421,265 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 fi
 ```
 
+### template
+
+Manage and use pre-built deployment templates.
+
+```bash
+nixernetes template [list|show|create] [options]
+```
+
+**Subcommands:**
+
+#### list
+List all available templates with descriptions.
+
+```bash
+nixernetes template list
+```
+
+Shows templates like:
+- `simple-web` - Single container with database
+- `microservices` - Multi-service architecture
+- `static-site` - Static site hosting
+- `minimal` - Minimal single container
+- `ml-pipeline` - Machine learning pipeline
+- `realtime-chat` - Real-time chat application
+- `iot-pipeline` - IoT data collection pipeline
+
+#### show
+Display detailed information about a template.
+
+```bash
+nixernetes template show microservices
+```
+
+**Example Output:**
+```
+Template: microservices
+Description: Complete microservices architecture with multiple services
+Services: frontend, api, worker
+Infrastructure: PostgreSQL, Redis, RabbitMQ
+Version: 1.0
+```
+
+#### create
+Create a new project from a template.
+
+```bash
+nixernetes template create <template-name> [project-name] [options]
+```
+
+**Options:**
+- `--output, -o` - Output directory
+- `--with-examples` - Include example configurations
+- `--skip-git` - Skip git initialization
+
+**Example:**
+```bash
+$ nixernetes template create microservices my-app --with-examples
+Creating project from microservices template...
+✓ Project created in my-app/
+✓ Configuration files generated
+✓ Example code created
+
+Next steps:
+  cd my-app
+  direnv allow
+  nixernetes validate
+```
+
+### generate-project
+
+Generate a complete project boilerplate with flake.nix and configurations.
+
+```bash
+nixernetes generate-project <project-name> [options]
+```
+
+**Options:**
+- `--template <template>` - Use specific template
+- `--description <text>` - Project description
+- `--author <name>` - Author name
+- `--with-tests` - Include test configuration
+- `--with-ci` - Include CI/CD workflows
+
+**Example:**
+```bash
+$ nixernetes generate-project my-platform --template microservices --with-ci
+Generating project boilerplate...
+✓ Created flake.nix
+✓ Created config/ directory with examples
+✓ Created .github/workflows/ with CI/CD
+✓ Created tests/ with example tests
+
+Project ready at: my-platform/
+```
+
+## New Commands (v1.2+)
+
+### scale
+
+Adjust replica counts for deployments.
+
+```bash
+nixernetes scale <deployment> <replicas> [--namespace NAMESPACE]
+```
+
+**Example:**
+```bash
+$ nixernetes scale api 5
+Scaling api to 5 replicas...
+✓ Deployment scaled
+```
+
+### logs
+
+Stream logs from deployments and pods.
+
+```bash
+nixernetes logs <deployment> [--follow] [--tail N]
+```
+
+**Options:**
+- `--follow, -f` - Follow log output (like tail -f)
+- `--tail <N>` - Show last N lines
+- `--since <duration>` - Show logs since duration (5m, 1h, etc)
+- `--container <name>` - Specific container
+- `--previous` - Show previous container logs
+
+**Example:**
+```bash
+$ nixernetes logs api -f --tail 50
+Streaming logs from api deployment...
+[2024-02-04 10:15:23] Starting API server
+[2024-02-04 10:15:24] Connected to database
+...
+```
+
+### exec
+
+Execute commands in running containers.
+
+```bash
+nixernetes exec <pod|deployment> <command> [--interactive] [--tty]
+```
+
+**Example:**
+```bash
+$ nixernetes exec api bash
+Connected to pod api-5d4f7c2b9...
+bash-5.1$
+```
+
+### port-forward
+
+Forward local port to pod.
+
+```bash
+nixernetes port-forward <pod|deployment> <local-port>:<pod-port>
+```
+
+**Example:**
+```bash
+$ nixernetes port-forward api 8080:5000
+Forwarding localhost:8080 -> pod:5000
+curl http://localhost:8080
+```
+
+### diff
+
+Show configuration differences before deployment.
+
+```bash
+nixernetes diff [--config FILE] [--namespace NAMESPACE]
+```
+
+**Example:**
+```bash
+$ nixernetes diff
+Calculating differences...
+
++ deployment.apps/api
+  - replicas: 1 -> 3
+  - image: myrepo/api:v1.0 -> myrepo/api:v1.1
+
+- service/old-service (will be removed)
+
+? pod/pending (status unknown)
+```
+
+### rollback
+
+Revert to previous configuration.
+
+```bash
+nixernetes rollback [--steps N] [--config FILE]
+```
+
+**Example:**
+```bash
+$ nixernetes rollback --steps 1
+Rolling back to previous configuration...
+✓ Rollback complete
+```
+
+### version
+
+Display version information.
+
+```bash
+nixernetes version [--detail]
+```
+
+**Example:**
+```bash
+$ nixernetes version
+Nixernetes CLI v1.2.0
+Framework: v1.2.0
+Modules: 35
+Last updated: 2024-02-04
+```
+
+### upgrade
+
+Update Nixernetes to latest version.
+
+```bash
+nixernetes upgrade [--to-version VERSION] [--dry-run]
+```
+
+**Example:**
+```bash
+$ nixernetes upgrade
+Checking for updates...
+✓ Update available: v1.2.1
+✓ Downloaded (12.5 MB)
+✓ Installation complete
+```
+
 ## CLI Roadmap
 
-Planned enhancements:
+Implemented features:
+- [x] `validate` - Configuration validation
+- [x] `init` - Project initialization
+- [x] `generate` - YAML generation
+- [x] `deploy` - Kubernetes deployment
+- [x] `template` - Template management
+- [x] `generate-project` - Project generation
+- [x] `logs` - Log streaming
+- [x] `exec` - Container execution
+- [x] `port-forward` - Port forwarding
+- [x] `diff` - Configuration diffing
+- [x] `version` - Version information
 
-- `diff` - Show changes before deployment
-- `rollback` - Revert to previous configuration
-- `scale` - Adjust replica counts
-- `logs` - Stream pod logs
-- `exec` - Execute commands in pods
-- `port-forward` - Local port forwarding
-- `version` - Display framework and CLI versions
-- `upgrade` - Update to new framework version
+Planned for future releases:
+- `rollback` - Configuration rollback
+- `scale` - Dynamic scaling
+- `status` - Deployment status
+- `delete` - Resource deletion
+- `upgrade` - Framework updates
+- Shell completion (bash, zsh, fish)
+- Config file support
+- Interactive mode
 

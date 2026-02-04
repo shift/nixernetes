@@ -1,0 +1,193 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.2.3)'
+        required: true
+
+jobs:
+  validate:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: cachix/install-nix-action@v22
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      
+      - name: Run all checks
+        run: nix flake check --offline
+      
+      - name: Build package
+        run: nix build .#default
+
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: cachix/install-nix-action@v22
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      
+      - name: Run test suite
+        run: nix develop -c -- python3 -m pytest tests/ -v
+
+  build:
+    name: Build Release Artifacts
+    needs: [validate, test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - uses: cachix/install-nix-action@v22
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      
+      - name: Build CLI artifact
+        run: |
+          nix build .#default
+          mkdir -p artifacts
+          cp bin/nixernetes artifacts/
+      
+      - name: Generate changelog
+        run: |
+          git log --oneline -n 20 > CHANGELOG_PREVIEW.txt
+          cat CHANGELOG_PREVIEW.txt
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: artifacts/
+
+  create-release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Get version from tag
+        id: get_version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-artifacts
+      
+      - name: Create release notes
+        run: |
+          cat > RELEASE_NOTES.md << 'EOF'
+          # ${{ steps.get_version.outputs.version }}
+          
+          ## What's New
+          
+          ### Features
+          - New starter kits for quick project setup
+          - Enhanced CLI with template commands
+          - Improved documentation with real-world examples
+          - GitHub Actions CI/CD workflows
+          
+          ### Bug Fixes
+          - Fixed various configuration validation issues
+          - Improved error messages
+          
+          ### Breaking Changes
+          - None
+          
+          ## Installation
+          
+          ```bash
+          curl -L https://github.com/anomalyco/nixernetes/releases/download/${{ steps.get_version.outputs.version }}/nixernetes -o ~/bin/nixernetes
+          chmod +x ~/bin/nixernetes
+          ```
+          
+          ## Getting Started
+          
+          - Check out the [Getting Started Guide](https://github.com/anomalyco/nixernetes/blob/main/GETTING_STARTED.md)
+          - Explore [Starter Kits](https://github.com/anomalyco/nixernetes/blob/main/STARTERS.md)
+          - Review [Module Reference](https://github.com/anomalyco/nixernetes/blob/main/MODULE_REFERENCE.md)
+          
+          ## Contributors
+          
+          Thanks to all contributors who made this release possible!
+          
+          EOF
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.get_version.outputs.version }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+          files: |
+            nixernetes
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish-docs:
+    name: Publish Documentation
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Build documentation site
+        run: |
+          echo "Documentation build would happen here"
+          echo "Using MkDocs or similar tool"
+      
+      - name: Deploy to GitHub Pages
+        run: |
+          echo "Deployment to GitHub Pages would happen here"
+
+  notify:
+    name: Send Notifications
+    needs: [validate, test, build, create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check status
+        run: |
+          if [ "${{ needs.validate.result }}" = "success" ] && \
+             [ "${{ needs.test.result }}" = "success" ] && \
+             [ "${{ needs.create-release.result }}" = "success" ]; then
+            echo "Release completed successfully!"
+          else
+            echo "Release failed - check logs"
+            exit 1
+          fi
+      
+      - name: Send Discord notification
+        if: always()
+        run: |
+          echo "Discord notification would be sent here"
+          echo "Release status: ${{ job.status }}"
+      
+      - name: Create issue for release notes
+        if: success()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: 'Release notes needed for ${{ github.ref }}',
+              body: 'Please update release notes and documentation after release.',
+              labels: ['documentation', 'release']
+            })

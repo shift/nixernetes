@@ -1,80 +1,60 @@
 ## Description
-Please include a summary of the changes and related context. What problem does this solve?
+<!-- Describe your changes in detail -->
 
-Fixes #(issue number if applicable)
+## Related Issue
+<!-- Link to related issue(s): Closes #123 -->
 
 ## Type of Change
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing configurations to change)
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that would cause existing functionality to change)
 - [ ] Documentation update
-- [ ] Module addition or refactoring
+- [ ] Refactoring (no functional changes)
+- [ ] Performance improvement
+- [ ] Dependency update
 
 ## Changes Made
-Describe the specific changes in this PR:
+<!-- List specific changes -->
 - Change 1
 - Change 2
 - Change 3
 
-## Module(s) Affected
-Which modules are affected by these changes?
-- [ ] Foundation
-- [ ] Core Kubernetes
-- [ ] Security & Compliance
-- [ ] Observability
-- [ ] Data & Events
-- [ ] Workloads
-- [ ] Operations
-
 ## Testing
-Describe the testing you've done:
+<!-- Describe how you've tested your changes -->
 
+### Test Coverage
 - [ ] Unit tests added/updated
 - [ ] Integration tests added/updated
 - [ ] Manual testing completed
-- [ ] All checks passing (`nix flake check`)
+- [ ] All tests passing
 
-### Test Results
+### How to Test
+```bash
+# Steps to verify the change
 ```
-Paste test output here
-```
-
-## Breaking Changes
-Does this PR include breaking changes? If yes, describe the migration path:
-
-## Documentation
-- [ ] README updated
-- [ ] Module documentation updated
-- [ ] Architecture documentation updated
-- [ ] Examples updated
-- [ ] CHANGELOG.md updated
-
-## Performance Impact
-Does this change affect performance?
-- [ ] No impact
-- [ ] Minor improvement
-- [ ] Minor regression (please explain)
-- [ ] Significant change (please explain)
-
-## Security Considerations
-Does this change introduce any security implications?
-- [ ] No security changes
-- [ ] Positive security improvement
-- [ ] Requires security review
 
 ## Checklist
-- [ ] Code follows the style guidelines (see CONTRIBUTING.md)
-- [ ] I have performed a self-review of my own code
-- [ ] I have commented my code, particularly in hard-to-understand areas
-- [ ] I have made corresponding changes to the documentation
-- [ ] My changes generate no new warnings
-- [ ] I have added tests that prove my fix is effective or that my feature works
-- [ ] New and existing unit tests pass locally with my changes
-- [ ] All integration tests pass (`nix flake check`)
+- [ ] My code follows the project's style guidelines
+- [ ] I have updated documentation if needed
+- [ ] I have added tests for my changes
+- [ ] All tests pass locally
+- [ ] I have checked for breaking changes
+- [ ] Commit messages are descriptive
+- [ ] No unnecessary dependencies added
 
-## Additional Context
-Add any other context about the PR here, such as:
-- Related PRs or issues
-- Design decisions made
-- Alternative approaches considered
-- Known limitations
+## Screenshots/Output (if applicable)
+<!-- Include screenshots or output demonstrating the change -->
+
+## Performance Impact
+- [ ] No performance impact
+- [ ] Minor performance improvement
+- [ ] Significant performance improvement
+- [ ] Performance regression
+
+## Security Considerations
+- [ ] No security impact
+- [ ] Security review recommended
+- [ ] Security issue addressed
+
+## Additional Notes
+<!-- Any additional information reviewers should know -->

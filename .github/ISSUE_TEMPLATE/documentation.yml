@@ -1,0 +1,49 @@
+name: Documentation Issue
+description: Report missing or unclear documentation
+title: "[DOCS] "
+labels: ["documentation", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve our documentation!
+
+  - type: textarea
+    attributes:
+      label: Documentation Topic
+      description: Which documentation area is affected?
+      placeholder: e.g., "Getting Started", "Module Reference", etc.
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Problem Description
+      description: What's unclear or missing?
+      placeholder: Describe the documentation issue
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Suggested Improvement
+      description: How should this documentation be improved?
+      placeholder: Suggest a better explanation or structure
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Links or context
+      placeholder: Add any relevant links or context
+
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I have checked existing documentation
+          required: true
+        - label: This is not a support question
+          required: true

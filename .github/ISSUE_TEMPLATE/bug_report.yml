@@ -1,0 +1,84 @@
+name: Bug Report
+description: Report a bug in Nixernetes
+title: "[BUG] "
+labels: ["bug", "needs-triage"]
+assignees: []
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+  - type: textarea
+    attributes:
+      label: Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the issue you're experiencing
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Steps to Reproduce
+      description: Steps to reproduce the behavior
+      placeholder: |
+        1. Run command...
+        2. Configure...
+        3. See error...
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Expected Behavior
+      description: What you expected to happen
+      placeholder: Describe what should have happened
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Actual Behavior
+      description: What actually happened
+      placeholder: Describe what actually happened
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Error Output
+      description: Any error messages or stack traces
+      placeholder: |
+        ```
+        paste error output here
+        ```
+
+  - type: textarea
+    attributes:
+      label: Environment
+      description: Information about your environment
+      placeholder: |
+        - OS: [e.g., Ubuntu 22.04]
+        - Nix version: [e.g., 2.13]
+        - Kubernetes version: [e.g., 1.24]
+        - Nixernetes version: [e.g., 1.0.0]
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Any other context or screenshots
+      placeholder: Add any other context about the problem here
+
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for duplicates
+          required: true
+        - label: I have provided all necessary information
+          required: true
+        - label: This is not a usage question (use Discussions for that)
+          required: true

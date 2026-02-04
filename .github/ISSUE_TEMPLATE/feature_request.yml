@@ -1,0 +1,81 @@
+name: Feature Request
+description: Propose a new feature for Nixernetes
+title: "[FEATURE] "
+labels: ["enhancement", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please provide clear details about what you'd like to see.
+
+  - type: textarea
+    attributes:
+      label: Problem Statement
+      description: Is your feature request related to a problem? Describe it.
+      placeholder: Describe the problem this would solve
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Proposed Solution
+      description: Describe what you'd like to see implemented
+      placeholder: Describe your proposed solution
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Use Cases
+      description: Real-world use cases for this feature
+      placeholder: |
+        - Use case 1
+        - Use case 2
+        - Use case 3
+
+  - type: textarea
+    attributes:
+      label: Alternatives Considered
+      description: Other solutions or features you've considered
+      placeholder: Describe alternative approaches
+
+  - type: dropdown
+    attributes:
+      label: Affected Area
+      options:
+        - CLI Tool
+        - Web UI
+        - Terraform Provider
+        - Modules
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    attributes:
+      label: Difficulty Level
+      options:
+        - Trivial
+        - Simple
+        - Moderate
+        - Complex
+        - Epic
+    validations:
+      required: true
+
+  - type: textarea
+    attributes:
+      label: Additional Context
+      description: Any additional context or mockups
+      placeholder: Add any other context or attachments here
+
+  - type: checkboxes
+    attributes:
+      label: Checklist
+      options:
+        - label: I have searched existing issues for similar requests
+          required: true
+        - label: This feature aligns with Nixernetes goals
+          required: true
