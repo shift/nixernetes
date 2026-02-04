@@ -23,6 +23,7 @@
            rbac = import ./src/lib/rbac.nix { inherit lib; };
            api = import ./src/lib/api.nix { inherit lib pkgs; };
            manifest = import ./src/lib/manifest.nix { inherit lib pkgs; };
+           externalSecrets = import ./src/lib/external-secrets.nix { inherit lib; };
            output = import ./src/lib/output.nix { inherit lib pkgs; };
            types = import ./src/lib/types.nix { inherit lib; };
            validation = import ./src/lib/validation.nix { inherit lib; };
