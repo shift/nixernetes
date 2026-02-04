@@ -204,7 +204,7 @@ in
     };
 
   # Generate complete policy set for application
-  mkApplicationPolicies = { name, namespace, apiVersion, dependencies ? [ ], exposedPorts ? [ 8080 ], allowedClients ? [ ] }:
+  mkApplicationPolicies = { name, namespace, apiVersion, dependencies ? [ ], exposedPorts ? [ 8080 ], allowedClients ? [ ], dependencyPorts ? { } }:
     let
       # Default deny everything
       defaultDeny = {
@@ -259,7 +259,7 @@ in
                 };
               }
             ];
-            ports = [ { protocol = "TCP"; port = 5432; } ]; # TODO: make configurable
+            ports = [ { protocol = "TCP"; port = dependencyPorts.${dep} or 80; } ];
           }) dependencies ++ [
             # Allow DNS
             {

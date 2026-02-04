@@ -6,6 +6,8 @@
 ![Nix](https://img.shields.io/badge/built%20with-Nix-5277C3)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-1.28--1.31-326CE5)
 
+Coded with AI with [Engram](https://github.com/vincents-ai/engram)
+
 Enterprise-grade Nix-driven Kubernetes manifest framework that abstracts Kubernetes complexity into strictly-typed, data-driven modules with built-in compliance enforcement and zero-trust security policies.
 
 ## Features at a Glance
@@ -581,7 +583,7 @@ For detailed setup instructions, see [GETTING_STARTED.md](GETTING_STARTED.md).
 
 ## License
 
-[To be determined]
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## Architecture Decision Records
 

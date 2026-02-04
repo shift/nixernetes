@@ -321,7 +321,7 @@ in
     metadata = { name = "payment-secrets"; namespace = "default"; };
     type = "Opaque";
     stringData = {
-      "stripe-key" = "sk_live_XXXXXXXX";  # Replace with actual key
+      "stripe-key" = "sk_live_YOUR_ACTUAL_STRIPE_KEY";  # Replace with your actual Stripe key
     };
   };
 
