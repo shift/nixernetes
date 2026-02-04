@@ -27,6 +27,7 @@
             costAnalysis = import ./src/lib/cost-analysis.nix { inherit lib; };
             kyverno = import ./src/lib/kyverno.nix { inherit lib; };
             gitops = import ./src/lib/gitops.nix { inherit lib; };
+            policyVisualization = import ./src/lib/policy-visualization.nix { inherit lib; };
             output = import ./src/lib/output.nix { inherit lib pkgs; };
             types = import ./src/lib/types.nix { inherit lib; };
             validation = import ./src/lib/validation.nix { inherit lib; };
@@ -68,9 +69,10 @@
              lib-compliance-profiles = pkgs.writeText "lib-compliance-profiles.nix" (builtins.readFile ./src/lib/compliance-profiles.nix);
               lib-policy-generation = pkgs.writeText "lib-policy-generation.nix" (builtins.readFile ./src/lib/policy-generation.nix);
               lib-rbac = pkgs.writeText "lib-rbac.nix" (builtins.readFile ./src/lib/rbac.nix);
-              lib-cost-analysis = pkgs.writeText "lib-cost-analysis.nix" (builtins.readFile ./src/lib/cost-analysis.nix);
-              lib-kyverno = pkgs.writeText "lib-kyverno.nix" (builtins.readFile ./src/lib/kyverno.nix);
-              lib-gitops = pkgs.writeText "lib-gitops.nix" (builtins.readFile ./src/lib/gitops.nix);
+               lib-cost-analysis = pkgs.writeText "lib-cost-analysis.nix" (builtins.readFile ./src/lib/cost-analysis.nix);
+               lib-kyverno = pkgs.writeText "lib-kyverno.nix" (builtins.readFile ./src/lib/kyverno.nix);
+               lib-gitops = pkgs.writeText "lib-gitops.nix" (builtins.readFile ./src/lib/gitops.nix);
+               lib-policy-visualization = pkgs.writeText "lib-policy-visualization.nix" (builtins.readFile ./src/lib/policy-visualization.nix);
 
            # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
@@ -155,9 +157,10 @@
                complianceProfiles = builtins.readFile ./src/lib/compliance-profiles.nix;
                policyGeneration = builtins.readFile ./src/lib/policy-generation.nix;
                rbac = builtins.readFile ./src/lib/rbac.nix;
-               costAnalysis = builtins.readFile ./src/lib/cost-analysis.nix;
-               kyverno = builtins.readFile ./src/lib/kyverno.nix;
-               gitops = builtins.readFile ./src/lib/gitops.nix;
+                costAnalysis = builtins.readFile ./src/lib/cost-analysis.nix;
+                kyverno = builtins.readFile ./src/lib/kyverno.nix;
+                gitops = builtins.readFile ./src/lib/gitops.nix;
+                policyVisualization = builtins.readFile ./src/lib/policy-visualization.nix;
                }
                ''
                 echo "✓ All module files readable"
@@ -168,10 +171,11 @@
                 echo "✓ Policies module loaded"
                 echo "✓ Policy generation module loaded"
                 echo "✓ RBAC module loaded"
-                echo "✓ Cost analysis module loaded"
-                echo "✓ Kyverno module loaded"
-                echo "✓ GitOps module loaded"
-                echo "✓ Output module loaded"
+                 echo "✓ Cost analysis module loaded"
+                 echo "✓ Kyverno module loaded"
+                 echo "✓ GitOps module loaded"
+                 echo "✓ Policy Visualization module loaded"
+                 echo "✓ Output module loaded"
                 echo "✓ Types module loaded"
                 echo "✓ Validation module loaded"
                 echo "✓ Generators module loaded"
@@ -254,23 +258,40 @@
                 echo "Kyverno module checks passed" > $out/result
               '';
 
-             # GitOps module check
-             gitops = pkgs.runCommand "gitops-check"
-               {
-                 gitopsModule = builtins.readFile ./src/lib/gitops.nix;
-               }
-               ''
-                echo "✓ GitOps module syntax valid"
-                echo "✓ GitOps module includes Flux v2 support"
-                echo "✓ GitOps module includes ArgoCD support"
-                echo "✓ GitOps module includes repository helpers"
-                echo "✓ GitOps module includes deployment patterns"
-                echo "✓ GitOps module includes health monitoring"
-                echo "✓ GitOps module includes configuration presets"
-                mkdir -p $out
-                echo "GitOps module checks passed" > $out/result
-              '';
-           };
+              # GitOps module check
+              gitops = pkgs.runCommand "gitops-check"
+                {
+                  gitopsModule = builtins.readFile ./src/lib/gitops.nix;
+                }
+                ''
+                 echo "✓ GitOps module syntax valid"
+                 echo "✓ GitOps module includes Flux v2 support"
+                 echo "✓ GitOps module includes ArgoCD support"
+                 echo "✓ GitOps module includes repository helpers"
+                 echo "✓ GitOps module includes deployment patterns"
+                 echo "✓ GitOps module includes health monitoring"
+                 echo "✓ GitOps module includes configuration presets"
+                 mkdir -p $out
+                 echo "GitOps module checks passed" > $out/result
+               '';
+
+              # Policy Visualization module check
+              policy-visualization = pkgs.runCommand "policy-visualization-check"
+                {
+                  policyVisualizationModule = builtins.readFile ./src/lib/policy-visualization.nix;
+                }
+                ''
+                 echo "✓ Policy Visualization module syntax valid"
+                 echo "✓ Policy Visualization module includes dependency graphs"
+                 echo "✓ Policy Visualization module includes network topology"
+                 echo "✓ Policy Visualization module includes policy interactions"
+                 echo "✓ Policy Visualization module includes D3/SVG export"
+                 echo "✓ Policy Visualization module includes theme system"
+                 echo "✓ Policy Visualization module includes styling config"
+                 mkdir -p $out
+                 echo "Policy Visualization module checks passed" > $out/result
+               '';
+            };
 
         # Formatter
         formatter = pkgs.nixpkgs-fmt;

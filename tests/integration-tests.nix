@@ -23,9 +23,10 @@ let
   output = import ../src/lib/output.nix { inherit lib pkgs; };
   types_module = import ../src/lib/types.nix { inherit lib; };
   generators = import ../src/lib/generators.nix { inherit lib pkgs; };
-  costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
-  kyverno = import ../src/lib/kyverno.nix { inherit lib; };
-  gitops = import ../src/lib/gitops.nix { inherit lib; };
+   costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
+   kyverno = import ../src/lib/kyverno.nix { inherit lib; };
+   gitops = import ../src/lib/gitops.nix { inherit lib; };
+   policyVisualization = import ../src/lib/policy-visualization.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -716,22 +717,177 @@ in
     expected = true;
   };
 
-  # Test 29: GitOps configuration presets
-  testGitOpsPresets = {
-    name = "gitops configuration presets";
-    test =
-      let
-        presets = gitops.presets;
-      in
-        # Should have all presets
-        (presets ? aggressive) &&
-        (presets ? standard) &&
-        (presets ? conservative) &&
-        (presets ? development) &&
-        # Each preset should have sync configuration
-        (presets.aggressive ? interval) &&
-        (presets.standard.interval == "10m") &&
-        (presets.conservative.prune == false);
-    expected = true;
-  };
+   # Test 29: GitOps configuration presets
+   testGitOpsPresets = {
+     name = "gitops configuration presets";
+     test =
+       let
+         presets = gitops.presets;
+       in
+         # Should have all presets
+         (presets ? aggressive) &&
+         (presets ? standard) &&
+         (presets ? conservative) &&
+         (presets ? development) &&
+         # Each preset should have sync configuration
+         (presets.aggressive ? interval) &&
+         (presets.standard.interval == "10m") &&
+         (presets.conservative.prune == false);
+     expected = true;
+   };
+
+   # Test 30: Policy Visualization - Dependency Graph
+   testPolicyVisualizationGraph = {
+     name = "policy visualization dependency graph";
+     test =
+       let
+         policies = [
+           {
+             metadata = {
+               name = "policy-a";
+               namespace = "default";
+               labels = { severity = "high"; };
+               annotations = { "depends-on" = "policy-b"; };
+             };
+             spec = { rules = [{} {} {}]; };
+           }
+           {
+             metadata = {
+               name = "policy-b";
+               namespace = "default";
+               labels = { severity = "medium"; };
+               annotations = { "validation-status" = "valid"; };
+             };
+             spec = { rules = [{} {}]; };
+           }
+         ];
+         graph = policyVisualization.dependencyGraph { inherit policies; };
+       in
+         # Should create valid dependency graph
+         (graph.type == "dependency-graph") &&
+         (builtins.length graph.nodes == 2) &&
+         (builtins.length graph.links > 0) &&
+         (graph.statistics.nodeCount == 2) &&
+         (graph.d3 ? nodes) &&
+         (graph.d3 ? links);
+     expected = true;
+   };
+
+   # Test 31: Policy Visualization - Network Topology
+   testPolicyVisualizationTopology = {
+     name = "policy visualization network topology";
+     test =
+       let
+         cluster = {
+           pods = [
+             {
+               metadata = { name = "pod-1"; namespace = "default"; labels = { app = "web"; }; };
+               spec = { containers = [{ name = "app"; }]; };
+               status = { phase = "Running"; };
+             }
+             {
+               metadata = { name = "pod-2"; namespace = "default"; labels = { app = "api"; }; };
+               spec = { containers = [{ name = "app"; }]; };
+               status = { phase = "Running"; };
+             }
+           ];
+           services = [
+             {
+               metadata = { name = "web-svc"; namespace = "default"; };
+               spec = { selector = { app = "web"; }; ports = [{ port = 80; }]; clusterIP = "10.0.0.1"; };
+             }
+           ];
+           networkPolicies = [];
+         };
+         topology = policyVisualization.networkTopology { inherit cluster; };
+       in
+         # Should create valid network topology
+         (topology.type == "network-topology") &&
+         (builtins.length topology.nodes > 0) &&
+         (topology.statistics.podCount == 2) &&
+         (topology.statistics.serviceCount == 1) &&
+         (topology.namespaces ? default);
+     expected = true;
+   };
+
+   # Test 32: Policy Visualization - Policy Interactions
+   testPolicyVisualizationInteractions = {
+     name = "policy visualization interactions";
+     test =
+       let
+         policies = [
+           {
+             metadata = {
+               name = "policy-x";
+               namespace = "default";
+               labels = { severity = "high"; };
+               annotations = {};
+             };
+             spec = { podSelector = { matchLabels = { app = "web"; }; }; rules = []; };
+           }
+           {
+             metadata = {
+               name = "policy-y";
+               namespace = "default";
+               labels = { severity = "medium"; };
+               annotations = {};
+             };
+             spec = { podSelector = { matchLabels = { app = "web"; }; }; rules = []; };
+           }
+         ];
+         interactions = policyVisualization.policyInteractions { inherit policies; };
+       in
+         # Should detect policy interactions
+         (interactions.type == "policy-interactions") &&
+         (interactions.statistics ? totalInteractions) &&
+         (interactions ? byType) &&
+         (interactions ? conflictMatrix);
+     expected = true;
+   };
+
+   # Test 33: Policy Visualization - SVG Export
+   testPolicyVisualizationExport = {
+     name = "policy visualization svg export";
+     test =
+       let
+         graph = policyVisualization.dependencyGraph {
+           policies = [
+             {
+               metadata = { name = "test-policy"; namespace = "default"; labels = { severity = "high"; }; annotations = {}; };
+               spec = { rules = [{}]; };
+             }
+           ];
+         };
+         export = policyVisualization.exportVisualization { visualization = graph; format = "svg"; };
+       in
+         # Should export valid visualization
+         (export.format == "svg") &&
+         (export ? config) &&
+         (export ? d3) &&
+         (export ? svg) &&
+         (export.svg ? metadata) &&
+         (export.svg.metadata ? width) &&
+         (export.svg.metadata.width == 1200);
+     expected = true;
+   };
+
+   # Test 34: Policy Visualization - Themes
+   testPolicyVisualizationThemes = {
+     name = "policy visualization themes";
+     test =
+       let
+         defaultTheme = policyVisualization.visualizationTheme {};
+         darkTheme = policyVisualization.visualizationTheme { theme = "dark"; };
+         minimalTheme = policyVisualization.visualizationTheme { theme = "minimal"; };
+       in
+         # Should create valid themes
+         (defaultTheme ? colors) &&
+         (defaultTheme.colors ? nodeDefault) &&
+         (defaultTheme ? styles) &&
+         (defaultTheme.styles.fontSize == 12) &&
+         (darkTheme.colors.background == "#1E1E1E") &&
+         (minimalTheme.styles.nodeOpacity == 1.0);
+     expected = true;
+   };
 }
+
