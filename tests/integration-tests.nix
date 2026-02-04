@@ -23,12 +23,13 @@ let
   output = import ../src/lib/output.nix { inherit lib pkgs; };
   types_module = import ../src/lib/types.nix { inherit lib; };
   generators = import ../src/lib/generators.nix { inherit lib pkgs; };
-   costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
-   kyverno = import ../src/lib/kyverno.nix { inherit lib; };
-   gitops = import ../src/lib/gitops.nix { inherit lib; };
-   policyVisualization = import ../src/lib/policy-visualization.nix { inherit lib; };
-   securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
-   performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
+    costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
+    kyverno = import ../src/lib/kyverno.nix { inherit lib; };
+    gitops = import ../src/lib/gitops.nix { inherit lib; };
+    policyVisualization = import ../src/lib/policy-visualization.nix { inherit lib; };
+    securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
+    performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
+    unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -1125,7 +1126,186 @@ in
          (report ? metrics) &&
          (report ? findings) &&
          (report ? actionPlan);
-     expected = true;
-   };
+      expected = true;
+    };
+
+    # Test 46: Unified API - Application Builder
+    testUnifiedApiApplicationBuilder = {
+      name = "unified API application builder";
+      test =
+        let
+          app = unifiedApi.mkApplication "test-app" {
+            image = "nginx:1.24";
+            replicas = 2;
+            namespace = "default";
+          };
+        in
+          # Should create valid application with name, image, replicas
+          (app.name == "test-app") &&
+          (app.image == "nginx:1.24") &&
+          (app.replicas == 2) &&
+          (app.namespace == "default") &&
+          (app.resources ? requests) &&
+          (app.resources ? limits);
+      expected = true;
+    };
+
+    # Test 47: Unified API - Cluster Builder
+    testUnifiedApiClusterBuilder = {
+      name = "unified API cluster builder";
+      test =
+        let
+          cluster = unifiedApi.mkCluster "prod-cluster" {
+            kubernetesVersion = "1.30";
+            provider = "aws";
+            region = "us-east-1";
+          };
+        in
+          # Should create valid cluster configuration
+          (cluster.name == "prod-cluster") &&
+          (cluster.kubernetesVersion == "1.30") &&
+          (cluster.provider == "aws") &&
+          (cluster.region == "us-east-1") &&
+          (cluster.compliance ? framework) &&
+          (cluster.observability ? enabled) &&
+          (cluster.networking ? policyMode);
+      expected = true;
+    };
+
+    # Test 48: Unified API - Security Policy Builder
+    testUnifiedApiSecurityPolicyBuilder = {
+      name = "unified API security policy builder";
+      test =
+        let
+          policy = unifiedApi.mkSecurityPolicy "strict-policy" {
+            namespace = "production";
+            level = "strict";
+          };
+        in
+          # Should create valid security policy
+          (policy.name == "strict-policy") &&
+          (policy.namespace == "production") &&
+          (policy.level == "strict") &&
+          (policy.podSecurity ? enforce) &&
+          (policy.networkPolicies ? enabled) &&
+          (policy.rbac ? enabled) &&
+          (policy.secretManagement ? encryptionAtRest);
+      expected = true;
+    };
+
+    # Test 49: Unified API - Compliance Builder
+    testUnifiedApiComplianceBuilder = {
+      name = "unified API compliance builder";
+      test =
+        let
+          socCompliance = unifiedApi.mkCompliance "SOC2" { auditLog = true; };
+          pciCompliance = unifiedApi.mkCompliance "PCI-DSS" { encryption = true; };
+          hipaaCompliance = unifiedApi.mkCompliance "HIPAA" { accessControl = true; };
+        in
+          # Should create valid compliance configurations
+          (socCompliance.name == "SOC2") &&
+          (socCompliance.auditLog == true) &&
+          (pciCompliance.name == "PCI-DSS") &&
+          (pciCompliance.encryption == true) &&
+          (hipaaCompliance.name == "HIPAA") &&
+          (hipaaCompliance.accessControl == true);
+      expected = true;
+    };
+
+    # Test 50: Unified API - Observability Builder
+    testUnifiedApiObservabilityBuilder = {
+      name = "unified API observability builder";
+      test =
+        let
+          observability = unifiedApi.mkObservability "monitoring" {
+            namespace = "monitoring";
+            logging = { enabled = true; backend = "loki"; };
+            metrics = { enabled = true; backend = "prometheus"; };
+          };
+        in
+          # Should create valid observability configuration
+          (observability.name == "monitoring") &&
+          (observability.namespace == "monitoring") &&
+          (observability.logging.enabled == true) &&
+          (observability.logging.backend == "loki") &&
+          (observability.metrics.enabled == true) &&
+          (observability.metrics.backend == "prometheus") &&
+          (observability.alerting ? enabled);
+      expected = true;
+    };
+
+    # Test 51: Unified API - Cost Tracking Builder
+    testUnifiedApiCostTrackingBuilder = {
+      name = "unified API cost tracking builder";
+      test =
+        let
+          costTracking = unifiedApi.mkCostTracking "aws-costs" {
+            provider = "aws";
+            resourceTracking = { enabled = true; };
+            costAnalysis = { enabled = true; };
+          };
+        in
+          # Should create valid cost tracking configuration
+          (costTracking.name == "aws-costs") &&
+          (costTracking.provider == "aws") &&
+          (costTracking.resourceTracking.enabled == true) &&
+          (costTracking.costAnalysis.enabled == true) &&
+          (costTracking.optimization ? enabled);
+      expected = true;
+    };
+
+    # Test 52: Unified API - Performance Tracking Builder
+    testUnifiedApiPerformanceTrackingBuilder = {
+      name = "unified API performance tracking builder";
+      test =
+        let
+          performance = unifiedApi.mkPerformanceTracking "perf-analysis" {
+            profiling = { enabled = true; cpuProfiling = true; };
+            benchmarking = { enabled = true; };
+          };
+        in
+          # Should create valid performance tracking configuration
+          (performance.name == "perf-analysis") &&
+          (performance.profiling.enabled == true) &&
+          (performance.profiling.cpuProfiling == true) &&
+          (performance.benchmarking.enabled == true) &&
+          (performance.bottleneckDetection ? enabled);
+      expected = true;
+    };
+
+    # Test 53: Unified API - Application Validation
+    testUnifiedApiApplicationValidation = {
+      name = "unified API application validation";
+      test =
+        let
+          validApp = unifiedApi.mkApplication "app" {
+            image = "nginx:1.24";
+            replicas = 1;
+          };
+          validationResult = unifiedApi.validateApplication validApp;
+        in
+          # Should validate correctly
+          (validationResult.valid == true) &&
+          (validationResult.errors == []);
+      expected = true;
+    };
+
+    # Test 54: Unified API - Cluster Validation
+    testUnifiedApiClusterValidation = {
+      name = "unified API cluster validation";
+      test =
+        let
+          validCluster = unifiedApi.mkCluster "test" {
+            kubernetesVersion = "1.30";
+            provider = "aws";
+          };
+          validationResult = unifiedApi.validateCluster validCluster;
+        in
+          # Should validate correctly
+          (validationResult.valid == true) &&
+          (validationResult.errors == []);
+      expected = true;
+    };
 }
+
 
