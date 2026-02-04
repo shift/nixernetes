@@ -25,6 +25,7 @@ let
   generators = import ../src/lib/generators.nix { inherit lib pkgs; };
   costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
   kyverno = import ../src/lib/kyverno.nix { inherit lib; };
+  gitops = import ../src/lib/gitops.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -574,6 +575,163 @@ in
       in
         # Validation should succeed for compliant resource
         (kyverno.validateAgainstPolicy resource policy) == true;
+    expected = true;
+  };
+
+  # Test 23: Flux v2 GitRepository generation
+  testFluxGitRepository = {
+    name = "flux gitrepository generation";
+    test =
+      let
+        gitRepo = gitops.mkGitRepository {
+          name = "test-repo";
+          url = "https://github.com/test/repo";
+          ref = { branch = "main"; };
+        };
+      in
+        # Should create valid Flux GitRepository
+        (gitRepo.apiVersion == "source.toolkit.fluxcd.io/v1") &&
+        (gitRepo.kind == "GitRepository") &&
+        (gitRepo.metadata.name == "test-repo") &&
+        (gitRepo.spec.url == "https://github.com/test/repo") &&
+        (gitRepo.spec.ref.branch == "main");
+    expected = true;
+  };
+
+  # Test 24: Flux v2 Kustomization generation
+  testFluxKustomization = {
+    name = "flux kustomization generation";
+    test =
+      let
+        kustomization = gitops.mkKustomization {
+          name = "test-kustomize";
+          sourceRef = { kind = "GitRepository"; name = "test-repo"; };
+          path = "./apps";
+        };
+      in
+        # Should create valid Flux Kustomization
+        (kustomization.apiVersion == "kustomize.toolkit.fluxcd.io/v1") &&
+        (kustomization.kind == "Kustomization") &&
+        (kustomization.metadata.name == "test-kustomize") &&
+        (kustomization.spec.path == "./apps") &&
+        (kustomization.spec.sourceRef.kind == "GitRepository") &&
+        (kustomization.spec.prune == true);
+    expected = true;
+  };
+
+  # Test 25: ArgoCD Application generation
+  testArgoCDApplication = {
+    name = "argocd application generation";
+    test =
+      let
+        app = gitops.mkApplication {
+          name = "test-app";
+          project = "default";
+          source = {
+            repoURL = "https://github.com/test/repo";
+            path = "./apps";
+          };
+          destination = {
+            namespace = "production";
+          };
+        };
+      in
+        # Should create valid ArgoCD Application
+        (app.apiVersion == "argoproj.io/v1alpha1") &&
+        (app.kind == "Application") &&
+        (app.metadata.name == "test-app") &&
+        (app.spec.project == "default") &&
+        (app.spec.source.repoURL == "https://github.com/test/repo") &&
+        (app.spec.destination.namespace == "production");
+    expected = true;
+  };
+
+  # Test 26: ArgoCD AppProject generation
+  testArgoCDAppProject = {
+    name = "argocd appproject generation";
+    test =
+      let
+        project = gitops.mkAppProject {
+          name = "test-project";
+          description = "Test project";
+          sourceRepos = ["https://github.com/test/repo"];
+          destinations = [
+            { namespace = "default"; server = "https://kubernetes.default.svc"; }
+          ];
+        };
+      in
+        # Should create valid ArgoCD AppProject
+        (project.apiVersion == "argoproj.io/v1alpha1") &&
+        (project.kind == "AppProject") &&
+        (project.metadata.name == "test-project") &&
+        (project.spec.description == "Test project") &&
+        (builtins.length project.spec.destinations > 0);
+    expected = true;
+  };
+
+  # Test 27: GitOps deployment patterns
+  testGitOpsDeploymentPatterns = {
+    name = "gitops deployment patterns";
+    test =
+      let
+        singleCluster = gitops.mkSingleClusterDeployment {
+          name = "single";
+          gitRepository = "https://github.com/test/repo";
+          path = "./apps";
+        };
+        
+        multiCluster = gitops.mkMultiClusterDeployment {
+          name = "multi";
+          gitRepository = "https://github.com/test/repo";
+          clusters = {
+            "us-east" = { server = "https://us-east.example.com"; };
+            "eu-west" = { server = "https://eu-west.example.com"; };
+          };
+        };
+      in
+        # Should create valid deployment patterns
+        (singleCluster ? flux) &&
+        (singleCluster ? argocd) &&
+        (multiCluster ? applications) &&
+        (multiCluster.clusterCount == 2);
+    expected = true;
+  };
+
+  # Test 28: GitOps sync policies
+  testGitOpsSyncPolicies = {
+    name = "gitops sync policies";
+    test =
+      let
+        syncPolicy = gitops.mkSyncPolicy {
+          automated = true;
+          syncOptions = ["CreateNamespace=true"];
+        };
+      in
+        # Should have valid sync policy
+        (syncPolicy ? automated) &&
+        (syncPolicy ? retry) &&
+        (builtins.length syncPolicy.syncOptions > 0) &&
+        (syncPolicy.automated.prune == true) &&
+        (syncPolicy.automated.selfHeal == true);
+    expected = true;
+  };
+
+  # Test 29: GitOps configuration presets
+  testGitOpsPresets = {
+    name = "gitops configuration presets";
+    test =
+      let
+        presets = gitops.presets;
+      in
+        # Should have all presets
+        (presets ? aggressive) &&
+        (presets ? standard) &&
+        (presets ? conservative) &&
+        (presets ? development) &&
+        # Each preset should have sync configuration
+        (presets.aggressive ? interval) &&
+        (presets.standard.interval == "10m") &&
+        (presets.conservative.prune == false);
     expected = true;
   };
 }
