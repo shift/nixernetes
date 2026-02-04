@@ -1,468 +1,524 @@
-# Nixernetes API Reference
+API Reference
 
-## Overview
+Complete documentation for Nixernetes REST API endpoints.
 
-Complete API reference for the Nixernetes framework.
+Base URL: http://localhost:8080 (development)
 
-## Schema Module (`schema.nix`)
+Table of Contents
 
-API version resolution and Kubernetes schema management.
+1. Health & Status
+2. Projects API
+3. Manifests API
+4. Configurations API
+5. Activity API
+6. Error Responses
 
-### Functions
+1. HEALTH & STATUS
 
-```nix
-# Get API version for resource kind
-resolveApiVersion { 
-  kind = "Deployment";
-  kubernetesVersion = "1.30";
-}
-# Returns: "apps/v1"
+Get API Health Status
 
-# Get supported Kubernetes versions
-getSupportedVersions  
-# Returns: ["1.28" "1.29" "1.30" "1.31"]
+GET /health
 
-# Check if version is supported
-isSupportedVersion "1.30"  # Returns: true
-
-# Get full API map for version
-getApiMap "1.30"
-```
-
-## Types Module (`types.nix`)
-
-Kubernetes resource type definitions.
-
-### Types
-
-```nix
-k8sResource        # Base resource type
-k8sMetadata        # Metadata submodule
-deploymentSpec     # Deployment spec
-serviceSpec        # Service spec
-```
-
-### Constructors
-
-```nix
-mkDeployment {
-  name = "myapp";
-  namespace = "default";
-  replicas = 3;
-  selector.matchLabels = { "app" = "myapp"; };
-  template = { /* ... */ };
+Response: 200 OK
+{
+  "status": "ok"
 }
 
-mkService {
-  name = "myapp";
-  type = "ClusterIP";
-  ports = [ { port = 8080; } ];
+Get Cluster Information
+
+GET /api/cluster/info
+
+Response: 200 OK
+{
+  "version": "1.27.0",
+  "nodes": 3,
+  "namespaces": 8,
+  "pods": 45,
+  "services": 12
 }
 
-mkNamespace { name = "default"; }
-mkConfigMap { name = "config"; data = { }; }
-mkSecret { name = "secret"; data = { }; }
-```
+2. PROJECTS API
 
-## Compliance Module (`compliance.nix`)
+List All Projects
 
-Label injection and annotations.
+GET /api/projects?status=active
 
-### Functions
+Query Parameters:
+- status (optional): Filter by status (active, archived, error)
 
-```nix
-# Generate compliance labels
-mkComplianceLabels {
-  framework = "SOC2";
-  level = "high";
-  owner = "platform-team";
-  dataClassification = "internal";
-  auditRequired = true;
+Response: 200 OK
+[
+  {
+    "id": "proj-123",
+    "name": "Production Cluster",
+    "description": "Main production deployment",
+    "status": "active",
+    "owner": "admin",
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-20T14:45:00Z"
+  }
+]
+
+Create Project
+
+POST /api/projects
+
+Request Body:
+{
+  "name": "New Project",
+  "description": "Project description",
+  "owner": "user@example.com"
 }
 
-# Inject labels into resource
-withComplianceLabels {
-  resource = myDeployment;
-  labels = { "nixernetes.io/framework" = "SOC2"; };
+Response: 201 Created
+{
+  "id": "proj-new-123",
+  "name": "New Project",
+  "description": "Project description",
+  "status": "active",
+  "owner": "user@example.com",
+  "createdAt": "2024-01-20T15:00:00Z",
+  "updatedAt": "2024-01-20T15:00:00Z"
 }
 
-# Inject traceability annotations
-withTraceability {
-  resource = myDeployment;
-  buildId = "abc123";
+Get Project Details
+
+GET /api/projects/:id
+
+Path Parameters:
+- id: Project ID
+
+Response: 200 OK
+{
+  "id": "proj-123",
+  "name": "Production Cluster",
+  "description": "Main production deployment",
+  "status": "active",
+  "owner": "admin",
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-20T14:45:00Z",
+  "resourceCount": 45,
+  "manifestCount": 23,
+  "manifests": [
+    {
+      "id": "mf-456",
+      "name": "nginx-config",
+      "kind": "ConfigMap",
+      "valid": true
+    }
+  ],
+  "config": {}
 }
 
-# Validate compliance labels present
-validateComplianceLabels {
-  resource = myDeployment;
-  requiredLabels = { "nixernetes.io/framework" = "SOC2"; };
-}
-```
+Update Project
 
-## Compliance Enforcement Module (`compliance-enforcement.nix`)
+PUT /api/projects/:id
 
-Policy generation and enforcement.
-
-### Levels
-
-- `unrestricted`: No special requirements
-- `low`: Basic compliance (audit + RBAC)
-- `medium`: Standard compliance (encryption + policies)
-- `high`: Strict compliance (mTLS + hardening)
-- `restricted`: Maximum compliance (binary auth + scanning)
-
-### Functions
-
-```nix
-# Get requirements for level
-getComplianceRequirements "high"
-
-# Check resource compliance
-checkCompliance {
-  resource = myDeployment;
-  level = "high";
+Request Body:
+{
+  "name": "Updated Name",
+  "description": "New description",
+  "status": "archived"
 }
 
-# Generate compliance report
-generateComplianceReport {
-  resources = [ /* ... */ ];
-  level = "high";
+Response: 200 OK
+{
+  "id": "proj-123",
+  "name": "Updated Name",
+  ...
 }
 
-# Enforce compliance on resources
-enforceCompliance {
-  resources = [ /* ... */ ];
-  level = "high";
-  buildId = "abc123";
-  failOnNoncompliant = true;
+Delete Project
+
+DELETE /api/projects/:id
+
+Response: 200 OK
+{
+  "message": "Project deleted"
 }
 
-# Create audit trail
-mkAuditTrail {
-  resources = [ /* ... */ ];
-  level = "high";
-  timestamp = "2024-01-01";
-  commitId = "abc123";
-}
-```
+3. MANIFESTS API
 
-## Compliance Profiles Module (`compliance-profiles.nix`)
+List Manifests for Project
 
-Environment-specific compliance.
+GET /api/manifests?projectId=proj-123
 
-### Profiles
+Query Parameters:
+- projectId (required): Project ID
 
-```nix
-getProfile "development"   # Low compliance
-getProfile "staging"       # Medium compliance
-getProfile "production"    # High compliance
-getProfile "regulated"     # Restricted compliance
-```
+Response: 200 OK
+[
+  {
+    "id": "mf-123",
+    "projectId": "proj-123",
+    "name": "app-config",
+    "kind": "ConfigMap",
+    "apiVersion": "v1",
+    "namespace": "default",
+    "data": {
+      "app.conf": "key=value"
+    },
+    "valid": true,
+    "createdAt": "2024-01-15T10:30:00Z",
+    "updatedAt": "2024-01-20T14:45:00Z"
+  }
+]
 
-### Functions
+Create Manifest
 
-```nix
-# Create environment-specific compliance
-mkEnvironmentCompliance {
-  environment = "production";
-  framework = "SOC2";
-  owner = "platform-team";
-}
+POST /api/manifests
 
-# Check deployment compatibility
-isCompatible {
-  deployment = myApp;
-  environment = "production";
-}
-
-# Multi-environment configuration
-mkMultiEnvironmentDeployment {
-  name = "myapp";
-  framework = "SOC2";
-  owner = "platform-team";
-  dev = { /* ... */ };
-  staging = { /* ... */ };
-  production = { /* ... */ };
-}
-```
-
-## Policies Module (`policies.nix`)
-
-Basic NetworkPolicy and Kyverno generation.
-
-### Functions
-
-```nix
-# Default-deny NetworkPolicy
-mkDefaultDenyNetworkPolicy {
-  name = "myapp";
-  namespace = "default";
-  apiVersion = "networking.k8s.io/v1";
+Request Body:
+{
+  "projectId": "proj-123",
+  "name": "nginx-deployment",
+  "kind": "Deployment",
+  "apiVersion": "apps/v1",
+  "namespace": "default",
+  "data": {
+    "spec": {
+      "replicas": 3,
+      "selector": {
+        "matchLabels": {
+          "app": "nginx"
+        }
+      }
+    }
+  },
+  "valid": false
 }
 
-# Dependency NetworkPolicy
-mkDependencyNetworkPolicy {
-  name = "myapp";
-  namespace = "default";
-  apiVersion = "networking.k8s.io/v1";
-  dependencies = [ "postgres" ];
+Response: 201 Created
+{
+  "id": "mf-new-789",
+  "projectId": "proj-123",
+  "name": "nginx-deployment",
+  ...
 }
 
-# Ingress NetworkPolicy
-mkIngressNetworkPolicy {
-  name = "myapp";
-  namespace = "default";
-  apiVersion = "networking.k8s.io/v1";
-  ports = [ 8080 ];
+Get Manifest Details
+
+GET /api/manifests/:id
+
+Path Parameters:
+- id: Manifest ID
+
+Response: 200 OK
+{
+  "id": "mf-123",
+  "projectId": "proj-123",
+  "name": "app-config",
+  "kind": "ConfigMap",
+  "apiVersion": "v1",
+  "namespace": "default",
+  "data": {
+    "app.conf": "key=value"
+  },
+  "valid": true,
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-20T14:45:00Z"
 }
 
-# Kyverno ClusterPolicy
-mkComplianceClusterPolicy {
-  framework = "SOC2";
-  level = "high";
-}
-```
+Update Manifest
 
-## Policy Generation Module (`policy-generation.nix`)
+PUT /api/manifests/:id
 
-Advanced policy composition.
-
-### Functions
-
-```nix
-# RBAC for service account
-mkServiceAccountRBAC {
-  name = "myapp";
-  namespace = "default";
-  permissions = [ /* ... */ ];
+Request Body:
+{
+  "name": "updated-config",
+  "data": {
+    "app.conf": "new=config"
+  },
+  "valid": true
 }
 
-# Pod security policy
-mkPodSecurityPolicy {
-  name = "restricted";
-  level = "high";
+Response: 200 OK
+{
+  "id": "mf-123",
+  ...
 }
 
-# Application policies
-mkApplicationPolicies {
-  name = "myapp";
-  namespace = "default";
-  apiVersion = "networking.k8s.io/v1";
-  dependencies = [ "postgres" ];
-  exposedPorts = [ 8080 ];
-  allowedClients = [ /* ... */ ];
-}
-```
+Delete Manifest
 
-## RBAC Module (`rbac.nix`)
+DELETE /api/manifests/:id
 
-Role-based access control.
-
-### Functions
-
-```nix
-# Create Role
-mkRole {
-  name = "reader";
-  namespace = "default";
-  rules = [ /* ... */ ];
+Response: 200 OK
+{
+  "message": "Manifest deleted"
 }
 
-# Create RoleBinding
-mkRoleBinding {
-  name = "reader-binding";
-  namespace = "default";
-  role = "reader";
-  subjects = [ /* ... */ ];
+Validate Manifest
+
+POST /api/manifests/:id/validate
+
+Response: 200 OK
+{
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "field": "apiVersion",
+      "message": "apiVersion should be specified"
+    }
+  ]
 }
 
-# Create ServiceAccount with read-only permissions
-mkReadOnlyServiceAccount {
-  name = "viewer";
-  namespace = "default";
+Validation Error Example:
+
+{
+  "valid": false,
+  "errors": [
+    {
+      "field": "kind",
+      "message": "kind is required"
+    },
+    {
+      "field": "metadata.name",
+      "message": "metadata.name is required"
+    }
+  ],
+  "warnings": []
 }
 
-# Create ServiceAccount with edit permissions
-mkEditServiceAccount {
-  name = "editor";
-  namespace = "default";
+4. CONFIGURATIONS API
+
+List Configurations
+
+GET /api/configs?namespace=default&kind=ConfigMap
+
+Query Parameters:
+- namespace (optional): Filter by namespace
+- kind (optional): Filter by kind
+
+Response: 200 OK
+[
+  {
+    "id": "cfg-123",
+    "name": "app-config",
+    "kind": "ConfigMap",
+    "namespace": "default",
+    "created": "2024-01-15T10:30:00Z",
+    "updated": "2024-01-20T14:45:00Z",
+    "size": 1024
+  }
+]
+
+Create Configuration
+
+POST /api/configs
+
+Request Body:
+{
+  "name": "database-config",
+  "kind": "Secret",
+  "namespace": "default",
+  "data": {
+    "password": "secret123",
+    "username": "admin"
+  }
 }
 
-# Common rule sets
-readPodsRule           # Get/list/watch pods
-readDeploymentsRule    # Get/list/watch deployments
-configMapsRule         # Full access to configmaps
-secretsRule            # Full access to secrets
-```
-
-## API Module (`api.nix`)
-
-Multi-layer abstraction API.
-
-### Layer 2: Convenience Modules
-
-```nix
-layer2.deployment {
-  name = "myapp";
-  image = "myapp:1.0";
-  replicas = 2;
-  ports = [ 8080 ];
+Response: 201 Created
+{
+  "id": "cfg-new-456",
+  "name": "database-config",
+  ...
 }
 
-layer2.service {
-  name = "myapp";
-  port = 8080;
-  type = "ClusterIP";
+Delete Configuration
+
+DELETE /api/configs/:id
+
+Response: 200 OK
+{
+  "message": "Config deleted"
 }
 
-layer2.configMap { name = "config"; data = { }; }
-layer2.namespace { name = "myns"; }
-```
+5. ACTIVITY API
 
-### Layer 3: Applications
+Get Recent Activity
 
-```nix
-layer3.application {
-  name = "myapp";
-  image = "myapp:1.0";
-  replicas = 3;
-  ports = [ 8080 ];
-  
-  compliance = {
-    framework = "SOC2";
-    level = "high";
-    owner = "platform-team";
-  };
-  
-  dependencies = [ "postgres" ];
-  resources = { /* ... */ };
-}
-```
+GET /api/activity?limit=50
 
-## Manifest Module (`manifest.nix`)
+Query Parameters:
+- limit (optional): Number of recent activities (default: 50)
 
-Manifest assembly and generation.
+Response: 200 OK
+[
+  {
+    "id": "act-123",
+    "type": "create",
+    "resourceType": "manifest",
+    "resourceId": "mf-456",
+    "user": "admin",
+    "description": "Manifest 'nginx' created",
+    "metadata": {
+      "kind": "Deployment"
+    },
+    "createdAt": "2024-01-20T15:30:00Z"
+  },
+  {
+    "id": "act-122",
+    "type": "update",
+    "resourceType": "manifest",
+    "resourceId": "mf-456",
+    "user": "admin",
+    "description": "Manifest updated",
+    "metadata": null,
+    "createdAt": "2024-01-20T15:25:00Z"
+  },
+  {
+    "id": "act-121",
+    "type": "validate",
+    "resourceType": "manifest",
+    "resourceId": "mf-456",
+    "user": null,
+    "description": "Manifest passed validation",
+    "metadata": {
+      "valid": true,
+      "errors": [],
+      "warnings": []
+    },
+    "createdAt": "2024-01-20T15:20:00Z"
+  }
+]
 
-### Functions
+Activity Types:
+- create: Resource created
+- update: Resource updated
+- delete: Resource deleted
+- validate: Manifest validation performed
 
-```nix
-# Build manifest
-buildManifest {
-  resources = [ /* ... */ ];
-  kubernetesVersion = "1.30";
-}
+6. ERROR RESPONSES
 
-# Convert to YAML
-toYAML resources
+All errors follow this format:
 
-# Generate Helm chart
-toHelmChart {
-  name = "myapp";
-  resources = [ /* ... */ ];
-  version = "1.0.0";
-  description = "My app";
-}
-
-# Generate report
-generateReport { manifest = myManifest; }
-
-# Validate manifest
-validateForDeployment { manifest = myManifest; }
-```
-
-## Output Module (`output.nix`)
-
-YAML and Helm generation.
-
-### Functions
-
-```nix
-# Order resources for kubectl apply
-orderResourcesForApply resources
-
-# Convert to YAML
-resourcesToYaml resources
-
-# Generate Helm chart
-mkHelmChart {
-  name = "myapp";
-  resources = [ /* ... */ ];
-  version = "1.0.0";
-}
-```
-
-## ExternalSecrets Module (`external-secrets.nix`)
-
-Secret management integration.
-
-### Functions
-
-```nix
-# Create ExternalSecret
-mkExternalSecret {
-  name = "db-password";
-  namespace = "default";
-  secretStore = "vault";
-  data = [ /* ... */ ];
+{
+  "error": "Error description",
+  "message": "Detailed error message (development only)"
 }
 
-# Create Vault SecretStore
-mkVaultSecretStore {
-  name = "vault";
-  namespace = "default";
-  server = "https://vault.example.com";
-  auth = { /* ... */ };
+Common Status Codes:
+
+200 OK
+Request succeeded
+
+201 Created
+Resource created successfully
+
+400 Bad Request
+Invalid request parameters
+
+Example:
+{
+  "error": "name and kind are required"
 }
 
-# Create AWS SecretStore
-mkAWSSecretStore {
-  name = "aws-secrets";
-  namespace = "default";
-  region = "us-east-1";
-  auth = { /* ... */ };
+404 Not Found
+Resource not found
+
+Example:
+{
+  "error": "Project not found"
 }
 
-# Create ClusterSecretStore
-mkClusterSecretStore {
-  name = "global-vault";
-  provider = { /* ... */ };
-}
-```
+500 Internal Server Error
+Server error
 
-## Validation Module (`validation.nix`)
-
-Manifest validation.
-
-### Functions
-
-```nix
-# Check required labels
-requireLabels {
-  resource = myDeployment;
-  required = { "nixernetes.io/framework" = "SOC2"; };
+Example:
+{
+  "error": "Failed to create project",
+  "message": "Database connection error (development only)"
 }
 
-# Validate namespaces exist
-validateNamespaces {
-  namespace = "default";
-  resources = [ /* ... */ ];
+Rate Limiting
+
+Current implementation has no rate limiting. For production, consider:
+- Express rate-limit middleware
+- Per-IP or per-user limits
+- Exponential backoff for retries
+
+Authentication
+
+Current implementation has no authentication. For production:
+- Add JWT bearer token validation
+- Implement user roles and permissions
+- Add API key support
+
+CORS
+
+Allowed origins can be configured via CORS_ORIGIN environment variable.
+
+Default (development): http://localhost:5173
+
+Example for Production:
+
+CORS_ORIGIN=https://example.com npm run start
+
+Testing Endpoints
+
+Using curl:
+
+Get health status:
+  curl http://localhost:8080/health
+
+List projects:
+  curl http://localhost:8080/api/projects
+
+Create project:
+  curl -X POST http://localhost:8080/api/projects \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Test","owner":"admin"}'
+
+Using VS Code REST Client:
+
+Create a file test.http:
+
+@baseUrl = http://localhost:8080
+
+### Health check
+GET {{baseUrl}}/health
+
+### List projects
+GET {{baseUrl}}/api/projects?status=active
+
+### Create project
+POST {{baseUrl}}/api/projects
+Content-Type: application/json
+
+{
+  "name": "Test Project",
+  "owner": "admin"
 }
 
-# Comprehensive validation
-validateManifest {
-  resources = [ /* ... */ ];
-  schemaMap = apiMap;
-  kubernetesVersion = "1.30";
+Then use the "Send Request" CodeLens to test.
+
+Pagination
+
+Current implementation returns all results. For production, add:
+
+GET /api/projects?page=1&limit=20
+
+Response includes:
+{
+  "data": [...],
+  "pagination": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "pages": 5
+  }
 }
 
-# Validation summary
-validationSummary {
-  resources = [ /* ... */ ];
-  schemaMap = apiMap;
-  kubernetesVersion = "1.30";
-}
-```
+Filtering and Sorting
 
-## Examples
+Consider adding for future versions:
 
-See `src/examples/web-app.nix` for complete working examples.
+GET /api/manifests?projectId=proj-123&kind=Deployment&sort=name&order=asc
+
+Bulk Operations
+
+Consider implementing for future versions:
+
+POST /api/manifests/batch
+DELETE /api/manifests/batch
