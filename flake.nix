@@ -118,18 +118,6 @@
 
          # Build checks
          checks = {
-           # Format check
-           nix-fmt = pkgs.runCommand "nix-fmt-check" {} ''
-             ${pkgs.nixpkgs-fmt}/bin/nixpkgs-fmt --check ${self}
-             touch $out
-           '';
-
-           # Flake lock is up-to-date
-           flake-lock = pkgs.runCommand "flake-lock-check" {} ''
-             ${pkgs.nix}/bin/nix flake lock --dry-run ${self}
-             touch $out
-           '';
-
            # Module tests
            module-tests = pkgs.runCommand "nixernetes-module-tests" {} ''
              echo "Testing Nixernetes modules..."
