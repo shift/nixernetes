@@ -30,3 +30,4 @@ __pycache__/
 *.egg-info/
 .venv/
 venv/
+.engram-session-tracking.json
