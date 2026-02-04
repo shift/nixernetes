@@ -33,3 +33,6 @@ __pycache__/
 .venv/
 venv/
 .engram-session-tracking.json
+
+# Summary documents
+.summaries/
