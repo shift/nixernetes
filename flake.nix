@@ -12,13 +12,16 @@
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
 
-        # Import our custom library modules
-        nixernetes = {
-          schema = import ./src/lib/schema.nix { inherit lib; };
-          compliance = import ./src/lib/compliance.nix { inherit lib; };
-          policies = import ./src/lib/policies.nix { inherit lib; };
-          output = import ./src/lib/output.nix { inherit lib pkgs; };
-        };
+         # Import our custom library modules
+         nixernetes = {
+           schema = import ./src/lib/schema.nix { inherit lib; };
+           compliance = import ./src/lib/compliance.nix { inherit lib; };
+           policies = import ./src/lib/policies.nix { inherit lib; };
+           output = import ./src/lib/output.nix { inherit lib pkgs; };
+           types = import ./src/lib/types.nix { inherit lib; };
+           validation = import ./src/lib/validation.nix { inherit lib; };
+           generators = import ./src/lib/generators.nix { inherit lib pkgs; };
+         };
 
         # Test runner for module validation
         runTests = pkgs.writeShellScript "nixernetes-tests" ''
@@ -42,12 +45,15 @@
 
       in
        {
-         packages = {
-           # Library modules (as documentation)
-           lib-schema = pkgs.writeText "lib-schema.nix" (builtins.readFile ./src/lib/schema.nix);
-           lib-compliance = pkgs.writeText "lib-compliance.nix" (builtins.readFile ./src/lib/compliance.nix);
-           lib-policies = pkgs.writeText "lib-policies.nix" (builtins.readFile ./src/lib/policies.nix);
-           lib-output = pkgs.writeText "lib-output.nix" (builtins.readFile ./src/lib/output.nix);
+           packages = {
+             # Library modules (as documentation)
+             lib-schema = pkgs.writeText "lib-schema.nix" (builtins.readFile ./src/lib/schema.nix);
+             lib-compliance = pkgs.writeText "lib-compliance.nix" (builtins.readFile ./src/lib/compliance.nix);
+             lib-policies = pkgs.writeText "lib-policies.nix" (builtins.readFile ./src/lib/policies.nix);
+             lib-output = pkgs.writeText "lib-output.nix" (builtins.readFile ./src/lib/output.nix);
+             lib-types = pkgs.writeText "lib-types.nix" (builtins.readFile ./src/lib/types.nix);
+             lib-validation = pkgs.writeText "lib-validation.nix" (builtins.readFile ./src/lib/validation.nix);
+             lib-generators = pkgs.writeText "lib-generators.nix" (builtins.readFile ./src/lib/generators.nix);
 
            # Example package: Simple microservice deployment
            example-app = pkgs.runCommand "example-app-manifests" {
@@ -125,6 +131,9 @@
                compliance = builtins.readFile ./src/lib/compliance.nix;
                policies = builtins.readFile ./src/lib/policies.nix;
                output = builtins.readFile ./src/lib/output.nix;
+               types = builtins.readFile ./src/lib/types.nix;
+               validation = builtins.readFile ./src/lib/validation.nix;
+               generators = builtins.readFile ./src/lib/generators.nix;
              }
              ''
               echo "✓ All module files readable"
@@ -132,6 +141,9 @@
               echo "✓ Compliance module loaded"
               echo "✓ Policies module loaded"
               echo "✓ Output module loaded"
+              echo "✓ Types module loaded"
+              echo "✓ Validation module loaded"
+              echo "✓ Generators module loaded"
               touch $out
             '';
 
