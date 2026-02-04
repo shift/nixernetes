@@ -39,7 +39,10 @@ let
          apiGateway = import ../src/lib/api-gateway.nix { inherit lib; };
          containerRegistry = import ../src/lib/container-registry.nix { inherit lib; };
          mlOperations = import ../src/lib/ml-operations.nix { inherit lib; };
-  
+         batchProcessing = import ../src/lib/batch-processing.nix { inherit lib; };
+         databaseManagement = import ../src/lib/database-management.nix { inherit lib; };
+         eventProcessing = import ../src/lib/event-processing.nix { inherit lib; };
+   
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
     let
@@ -3263,6 +3266,415 @@ in
             (builtins.elem "Feature store integration" framework.features) &&
             (builtins.elem "AutoML capabilities" framework.features) &&
             (builtins.elem "Jupyter notebook management" framework.features);
+        expected = true;
+      };
+
+      # Test 135: Batch Processing - Kubernetes Job
+      testBatchProcessingKubernetesJob = {
+        name = "batch processing kubernetes job";
+        test =
+          let
+            config = batchProcessing.mkKubernetesJob {
+              name = "data-processor";
+              namespace = "batch";
+              image = "python:3.11";
+              command = ["python"];
+              args = ["/scripts/process.py"];
+            };
+          in
+            (config.apiVersion == "batch/v1") &&
+            (config.kind == "Job") &&
+            (config.metadata.name == "data-processor") &&
+            (config.metadata.labels ? "nixernetes.io/framework");
+        expected = true;
+      };
+
+      # Test 136: Batch Processing - CronJob
+      testBatchProcessingCronJob = {
+        name = "batch processing cron job";
+        test =
+          let
+            config = batchProcessing.mkCronJob {
+              name = "daily-cleanup";
+              namespace = "batch";
+              schedule = "0 2 * * *";
+              image = "cleanup:latest";
+            };
+          in
+            (config.apiVersion == "batch/v1") &&
+            (config.kind == "CronJob") &&
+            (config.spec.schedule == "0 2 * * *") &&
+            (config.metadata.labels ? "nixernetes.io/batch-type");
+        expected = true;
+      };
+
+      # Test 137: Batch Processing - Airflow
+      testBatchProcessingAirflow = {
+        name = "batch processing airflow deployment";
+        test =
+          let
+            config = batchProcessing.mkAirflowDeployment {
+              name = "airflow";
+              namespace = "batch";
+              executor = "KubernetesExecutor";
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.metadata.namespace == "batch") &&
+            (config.data ? "AIRFLOW__CORE__EXECUTOR") &&
+            (config.data.AIRFLOW__CORE__EXECUTOR == "KubernetesExecutor");
+        expected = true;
+      };
+
+      # Test 138: Batch Processing - Argo Workflow
+      testBatchProcessingArgoWorkflow = {
+        name = "batch processing argo workflow";
+        test =
+          let
+            config = batchProcessing.mkArgoWorkflow {
+              name = "data-pipeline";
+              namespace = "argo";
+              steps = [];
+            };
+          in
+            (config.apiVersion == "argoproj.io/v1alpha1") &&
+            (config.kind == "Workflow") &&
+            (config.metadata.name == "data-pipeline") &&
+            (config.metadata.labels ? "nixernetes.io/batch-type");
+        expected = true;
+      };
+
+      # Test 139: Batch Processing - Spark Job
+      testBatchProcessingSparkJob = {
+        name = "batch processing spark job";
+        test =
+          let
+            config = batchProcessing.mkSparkJob {
+              name = "etl-job";
+              namespace = "spark";
+              mainClass = "com.example.ETL";
+              mainApplicationFile = "s3://jars/etl.jar";
+            };
+          in
+            (config.apiVersion == "sparkoperator.k8s.io/v1beta2") &&
+            (config.kind == "SparkApplication") &&
+            (config.metadata.name == "etl-job") &&
+            (config.spec.mode == "cluster");
+        expected = true;
+      };
+
+      # Test 140: Batch Processing - Job Queue
+      testBatchProcessingJobQueue = {
+        name = "batch processing job queue";
+        test =
+          let
+            config = batchProcessing.mkJobQueue {
+              name = "high-priority";
+              namespace = "batch";
+              concurrency = 20;
+              priority = 10;
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.metadata.name == "high-priority-queue-config") &&
+            (config.data ? "QUEUE_NAME") &&
+            (config.data.MAX_CONCURRENCY == "20");
+        expected = true;
+      };
+
+      # Test 141: Batch Processing - Framework Information
+      testBatchProcessingFrameworkInfo = {
+        name = "batch processing framework information";
+        test =
+          let
+            framework = batchProcessing.framework;
+          in
+            (framework.name == "batch-processing") &&
+            (framework.version == "1.0.0") &&
+            (builtins.elem "Kubernetes Jobs and CronJobs" framework.features) &&
+            (builtins.elem "Airflow DAG orchestration" framework.features) &&
+            (builtins.elem "Argo Workflows engine" framework.features) &&
+            (builtins.elem "Spark batch processing" framework.features);
+        expected = true;
+      };
+
+      # Test 142: Database Management - PostgreSQL
+      testDatabaseManagementPostgreSQL = {
+        name = "database management postgresql";
+        test =
+          let
+            config = databaseManagement.mkPostgreSQL {
+              name = "app-postgres";
+              namespace = "databases";
+              replicas = 3;
+              mode = "ha";
+            };
+          in
+            (config.apiVersion == "postgresql.cnpg.io/v1") &&
+            (config.kind == "Cluster") &&
+            (config.metadata.name == "app-postgres") &&
+            (config.spec.instances == 3);
+        expected = true;
+      };
+
+      # Test 143: Database Management - MySQL
+      testDatabaseManagementMySQL = {
+        name = "database management mysql";
+        test =
+          let
+            config = databaseManagement.mkMySQL {
+              name = "app-mysql";
+              namespace = "databases";
+              version = "8.0";
+              replicas = 3;
+            };
+          in
+            (config.apiVersion == "mysql.oracle.com/v2") &&
+            (config.kind == "MySQLCluster") &&
+            (config.metadata.name == "app-mysql") &&
+            (config.spec.replicas == 3);
+        expected = true;
+      };
+
+      # Test 144: Database Management - MongoDB
+      testDatabaseManagementMongoDB = {
+        name = "database management mongodb";
+        test =
+          let
+            config = databaseManagement.mkMongoDB {
+              name = "app-mongo";
+              namespace = "databases";
+              version = "6.0";
+              replicas = 3;
+            };
+          in
+            (config.apiVersion == "mongodbcommunity.mongodb.com/v1") &&
+            (config.kind == "MongoDBCommunity") &&
+            (config.metadata.name == "app-mongo") &&
+            (config.spec.members == 3);
+        expected = true;
+      };
+
+      # Test 145: Database Management - Redis
+      testDatabaseManagementRedis = {
+        name = "database management redis";
+        test =
+          let
+            config = databaseManagement.mkRedis {
+              name = "app-cache";
+              namespace = "caching";
+              mode = "cluster";
+              replicas = 3;
+            };
+          in
+            (config.apiVersion == "redis.redis.io/v1alpha1") &&
+            (config.kind == "Redis") &&
+            (config.metadata.name == "app-cache") &&
+            (config.spec.mode == "cluster");
+        expected = true;
+      };
+
+      # Test 146: Database Management - Backup Policy
+      testDatabaseManagementBackupPolicy = {
+        name = "database management backup policy";
+        test =
+          let
+            config = databaseManagement.mkDatabaseBackup {
+              name = "postgres-backup";
+              namespace = "databases";
+              databaseType = "postgresql";
+              schedule = "0 2 * * *";
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.metadata.name == "postgres-backup-backup-policy") &&
+            (config.data ? "BACKUP_SCHEDULE") &&
+            (config.data.BACKUP_SCHEDULE == "0 2 * * *");
+        expected = true;
+      };
+
+      # Test 147: Database Management - Replication Config
+      testDatabaseManagementReplication = {
+        name = "database management replication";
+        test =
+          let
+            config = databaseManagement.mkReplication {
+              name = "postgres-replication";
+              namespace = "databases";
+              databaseType = "postgresql";
+              mode = "synchronous";
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.data ? "REPLICATION_MODE") &&
+            (config.data.REPLICATION_MODE == "synchronous") &&
+            (config.metadata.labels ? "nixernetes.io/policy-type");
+        expected = true;
+      };
+
+      # Test 148: Database Management - Framework Information
+      testDatabaseManagementFrameworkInfo = {
+        name = "database management framework information";
+        test =
+          let
+            framework = databaseManagement.framework;
+          in
+            (framework.name == "database-management") &&
+            (framework.version == "1.0.0") &&
+            (builtins.elem "PostgreSQL operator and deployment" framework.features) &&
+            (builtins.elem "MySQL operator and deployment" framework.features) &&
+            (builtins.elem "MongoDB operator and deployment" framework.features) &&
+            (builtins.elem "Redis caching layer" framework.features);
+        expected = true;
+      };
+
+      # Test 149: Event Processing - Kafka Cluster
+      testEventProcessingKafkaCluster = {
+        name = "event processing kafka cluster";
+        test =
+          let
+            config = eventProcessing.mkKafkaCluster {
+              name = "kafka-cluster";
+              namespace = "kafka";
+              replicas = 3;
+              version = "3.5.0";
+            };
+          in
+            (config.apiVersion == "kafka.strimzi.io/v1beta2") &&
+            (config.kind == "Kafka") &&
+            (config.metadata.name == "kafka-cluster") &&
+            (config.spec.kafka.replicas == 3);
+        expected = true;
+      };
+
+      # Test 150: Event Processing - NATS Cluster
+      testEventProcessingNATSCluster = {
+        name = "event processing nats cluster";
+        test =
+          let
+            config = eventProcessing.mkNATSCluster {
+              name = "nats-cluster";
+              namespace = "nats";
+              replicas = 3;
+              version = "2.10.0";
+            };
+          in
+            (config.apiVersion == "nats.io/v1alpha2") &&
+            (config.kind == "NatsCluster") &&
+            (config.metadata.name == "nats-cluster") &&
+            (config.spec.size == 3);
+        expected = true;
+      };
+
+      # Test 151: Event Processing - RabbitMQ Broker
+      testEventProcessingRabbitMQ = {
+        name = "event processing rabbitmq broker";
+        test =
+          let
+            config = eventProcessing.mkRabbitMQ {
+              name = "rabbitmq";
+              namespace = "rabbitmq";
+              replicas = 3;
+              version = "3.12.0";
+            };
+          in
+            (config.apiVersion == "rabbitmq.com/v1beta1") &&
+            (config.kind == "RabbitmqCluster") &&
+            (config.metadata.name == "rabbitmq") &&
+            (config.spec.replicas == 3);
+        expected = true;
+      };
+
+      # Test 152: Event Processing - Pulsar Cluster
+      testEventProcessingPulsarCluster = {
+        name = "event processing pulsar cluster";
+        test =
+          let
+            config = eventProcessing.mkPulsarCluster {
+              name = "pulsar";
+              namespace = "pulsar";
+              replicas = 3;
+              version = "3.0.0";
+            };
+          in
+            (config.apiVersion == "pulsar.apache.org/v1alpha1") &&
+            (config.kind == "PulsarCluster") &&
+            (config.metadata.name == "pulsar");
+        expected = true;
+      };
+
+      # Test 153: Event Processing - Kafka Topic
+      testEventProcessingKafkaTopic = {
+        name = "event processing kafka topic";
+        test =
+          let
+            config = eventProcessing.mkKafkaTopic {
+              name = "events";
+              cluster = "kafka-cluster";
+              namespace = "kafka";
+              partitions = 3;
+              replicationFactor = 3;
+            };
+          in
+            (config.apiVersion == "kafka.strimzi.io/v1beta2") &&
+            (config.kind == "KafkaTopic") &&
+            (config.metadata.name == "events") &&
+            (config.spec.partitions == 3);
+        expected = true;
+      };
+
+      # Test 154: Event Processing - Consumer Group
+      testEventProcessingConsumerGroup = {
+        name = "event processing consumer group";
+        test =
+          let
+            config = eventProcessing.mkConsumerGroup {
+              name = "event-processors";
+              namespace = "kafka";
+              brokers = ["kafka:9092"];
+              topics = ["events"];
+              consumerCount = 3;
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.metadata.name == "event-processors-consumer-config") &&
+            (config.data ? "CONSUMER_GROUP") &&
+            (config.data.CONSUMER_GROUP == "event-processors");
+        expected = true;
+      };
+
+      # Test 155: Event Processing - Dead Letter Queue
+      testEventProcessingDeadLetterQueue = {
+        name = "event processing dead letter queue";
+        test =
+          let
+            config = eventProcessing.mkDeadLetterQueue {
+              name = "failed-events";
+              namespace = "kafka";
+              sourceTopics = ["events"];
+              maxRetries = 3;
+            };
+          in
+            (config.kind == "ConfigMap") &&
+            (config.data ? "DLQ_NAME") &&
+            (config.data.DLQ_NAME == "failed-events") &&
+            (config.data.MAX_RETRIES == "3");
+        expected = true;
+      };
+
+      # Test 156: Event Processing - Framework Information
+      testEventProcessingFrameworkInfo = {
+        name = "event processing framework information";
+        test =
+          let
+            framework = eventProcessing.framework;
+          in
+            (framework.name == "event-processing") &&
+            (framework.version == "1.0.0") &&
+            (builtins.elem "Apache Kafka cluster deployment" framework.features) &&
+            (builtins.elem "NATS messaging system" framework.features) &&
+            (builtins.elem "RabbitMQ message broker" framework.features) &&
+            (builtins.elem "Apache Pulsar streaming" framework.features);
         expected = true;
       };
 
