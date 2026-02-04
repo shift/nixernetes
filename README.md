@@ -282,12 +282,51 @@ nixernetes/
 
 ### Simple Web App Deployment
 
-See `src/examples/web-app.nix` for a complete example with:
+See `src/examples/web-app.nix` for a basic example with:
 - Multi-app deployment (web-app + postgres)
 - Compliance configuration (SOC2, audit requirements)
 - ExternalSecret for database password
 - Resource constraints
 - Dependency declarations
+
+### Multi-Tier Production Application
+
+See `src/examples/multi-tier-app.nix` and `docs/MULTI_TIER_DEPLOYMENT.md` for a comprehensive production example with:
+
+**Architecture**:
+- Frontend (Nginx SPA server) - 3 replicas
+- API Gateway (Node.js) - 2 replicas  
+- PostgreSQL Database - with 50Gi storage
+- Redis Cache - with persistence
+- RabbitMQ Message Queue - with clustering
+- Prometheus Monitoring - with 100Gi time-series storage
+- Grafana Dashboards - with pre-configured datasources
+
+**Features Demonstrated**:
+- Compliance enforcement (SOC2/Strict)
+- Zero-trust networking with default-deny policies
+- RBAC with least-privilege service accounts
+- ExternalSecrets for sensitive data (Vault integration)
+- Resource requests/limits for all components
+- Health checks (liveness/readiness probes)
+- Pod security standards (restricted)
+- Observability with metrics and dashboards
+- Multi-environment deployment patterns
+- Data classification and audit trails
+
+**Quick Start**:
+```bash
+# View the comprehensive example
+cat src/examples/multi-tier-app.nix
+
+# Read the deployment guide
+cat docs/MULTI_TIER_DEPLOYMENT.md
+
+# Review security policies
+cat docs/SECURITY_POLICIES.md
+```
+
+This example showcases all Nixernetes capabilities in a realistic, production-grade scenario.
 
 ## Features
 
