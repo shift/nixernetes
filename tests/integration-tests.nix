@@ -30,6 +30,7 @@ let
     securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
     performanceAnalysis = import ../src/lib/performance-analysis.nix { inherit lib; };
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
+    policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -1306,6 +1307,189 @@ in
           (validationResult.errors == []);
       expected = true;
     };
+
+    # Test 55: Policy Testing - Test Builder
+    testPolicyTestingTestBuilder = {
+      name = "policy testing test builder";
+      test =
+        let
+          policy = kyverno.mkValidationPolicy {
+            name = "test-policy";
+            rules = [];
+          };
+          test = policyTesting.mkPolicyTest "test-1" {
+            inherit policy;
+            resource = { apiVersion = "v1"; kind = "Pod"; };
+            expectedResult = "pass";
+            tags = ["security"];
+          };
+        in
+          # Should create valid test
+          (test.name == "test-1") &&
+          (test.policy.metadata.name == "test-policy") &&
+          (test.expectedResult == "pass") &&
+          (builtins.elem "security" test.tags);
+      expected = true;
+    };
+
+    # Test 56: Policy Testing - Validation Policy Test
+    testPolicyTestingValidationPolicyTest = {
+      name = "policy testing validation policy test builder";
+      test =
+        let
+          policy = kyverno.mkValidationPolicy {
+            name = "validation-test-policy";
+            rules = [];
+          };
+          test = policyTesting.mkValidationPolicyTest "validation-test" {
+            inherit policy;
+            resource = { apiVersion = "v1"; kind = "Pod"; };
+            shouldPass = true;
+          };
+        in
+          # Should create validation policy test
+          (test.name == "validation-test") &&
+          (test.expectedResult == "pass") &&
+          (test.policy.metadata.name == "validation-test-policy");
+      expected = true;
+    };
+
+    # Test 57: Policy Testing - Mutation Policy Test
+    testPolicyTestingMutationPolicyTest = {
+      name = "policy testing mutation policy test builder";
+      test =
+        let
+          policy = kyverno.mkMutationPolicy {
+            name = "mutation-policy";
+            rules = [];
+          };
+          test = policyTesting.mkMutationPolicyTest "mutation-test" {
+            inherit policy;
+            resource = { apiVersion = "v1"; kind = "Pod"; };
+          };
+        in
+          # Should create mutation policy test
+          (test.name == "mutation-test") &&
+          (test.expectedResult == "mutate") &&
+          (test.policy.metadata.name == "mutation-policy");
+      expected = true;
+    };
+
+    # Test 58: Policy Testing - Test Suite Builder
+    testPolicyTestingTestSuite = {
+      name = "policy testing test suite builder";
+      test =
+        let
+          tests = [
+            { name = "test1"; result = { passed = true; duration = 1; }; }
+            { name = "test2"; result = { passed = true; duration = 2; }; }
+            { name = "test3"; result = { passed = false; duration = 1; }; }
+          ];
+          suite = policyTesting.mkPolicyTestSuite "test-suite" {
+            inherit tests;
+            policies = [];
+          };
+        in
+          # Should create valid test suite with statistics
+          (suite.name == "test-suite") &&
+          (suite.statistics.total == 3) &&
+          (suite.statistics.passed == 2) &&
+          (suite.statistics.failed == 1) &&
+          (suite.statistics.successRate == 66);  # 2/3 * 100 ≈ 66
+      expected = true;
+    };
+
+    # Test 59: Policy Testing - Policy Compliance Test
+    testPolicyTestingPolicyCompliance = {
+      name = "policy testing policy compliance";
+      test =
+        let
+          compliantPolicy = kyverno.mkValidationPolicy {
+            name = "well-documented-policy";
+            metadata = {
+              annotations = { description = "Test policy"; };
+            };
+            rules = [{
+              name = "test-rule";
+              match = { resources = { kinds = ["Pod"]; }; };
+            }];
+          };
+          compliance = policyTesting.mkPolicyComplianceTest compliantPolicy;
+        in
+          # Should verify policy compliance
+          (compliance.hasValidStructure == true) &&
+          (compliance.isDocumented == true) &&
+          (compliance.hasMeaningfulName == true) &&
+          (compliance.hasSelectors == true);
+      expected = true;
+    };
+
+    # Test 60: Policy Testing - Coverage Analysis
+    testPolicyTestingCoverageAnalysis = {
+      name = "policy testing coverage analysis";
+      test =
+        let
+          policies = [
+            (kyverno.mkValidationPolicy {
+              name = "policy1";
+              rules = [
+                { name = "rule1"; match = { resources = { kinds = ["Pod"]; }; }; }
+                { name = "rule2"; match = { resources = { kinds = ["Pod"]; }; }; }
+              ];
+            })
+            (kyverno.mkMutationPolicy {
+              name = "policy2";
+              rules = [
+                { name = "rule3"; match = { resources = { kinds = ["Deployment"]; }; }; }
+              ];
+            })
+          ];
+          coverage = policyTesting.analyzePolicyCoverage policies;
+        in
+          # Should analyze coverage correctly
+          (coverage.totalPolicies == 2) &&
+          (coverage.totalRules == 3) &&
+          (coverage.validationPolicies == 1) &&
+          (coverage.mutationPolicies == 1) &&
+          (coverage.generationPolicies == 0);
+      expected = true;
+    };
+
+    # Test 61: Policy Testing - Test Fixtures
+    testPolicyTestingFixtures = {
+      name = "policy testing fixtures";
+      test =
+        let
+          restrictedFixture = policyTesting.fixtures.restrictedPod;
+          permissiveFixture = policyTesting.fixtures.permissivePod;
+          deploymentFixture = policyTesting.fixtures.standardDeployment;
+        in
+          # Should provide valid fixtures
+          (restrictedFixture.kind == "Pod") &&
+          (restrictedFixture.metadata.name == "restricted-pod") &&
+          (permissiveFixture.kind == "Pod") &&
+          (permissiveFixture.metadata.name == "permissive-pod") &&
+          (deploymentFixture.kind == "Deployment") &&
+          (deploymentFixture.metadata.name == "standard-app");
+      expected = true;
+    };
+
+    # Test 62: Policy Testing - Framework Information
+    testPolicyTestingFrameworkInfo = {
+      name = "policy testing framework information";
+      test =
+        let
+          framework = policyTesting.framework;
+        in
+          # Should provide framework metadata
+          (framework.name == "Nixernetes Policy Testing Framework") &&
+          (framework.version == "1.0.0") &&
+          (framework.features ? "validation-policy-testing") &&
+          (builtins.elem "ClusterPolicy" framework.supportedPolicyTypes) &&
+          (builtins.elem "unit" framework.testFrameworks);
+      expected = true;
+    };
 }
+
 
 
