@@ -27,6 +27,7 @@ let
    kyverno = import ../src/lib/kyverno.nix { inherit lib; };
    gitops = import ../src/lib/gitops.nix { inherit lib; };
    policyVisualization = import ../src/lib/policy-visualization.nix { inherit lib; };
+   securityScanning = import ../src/lib/security-scanning.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -887,6 +888,106 @@ in
          (defaultTheme.styles.fontSize == 12) &&
          (darkTheme.colors.background == "#1E1E1E") &&
          (minimalTheme.styles.nodeOpacity == 1.0);
+     expected = true;
+   };
+
+   # Test 35: Security Scanning - Trivy Image Scanning
+   testSecurityScanningTrivy = {
+     name = "security scanning trivy image scan";
+     test =
+       let
+         images = [ "nginx:latest" "postgres:15" "redis:7.0" ];
+         scan = securityScanning.trivyScan { inherit images; };
+       in
+         # Should create valid trivy scan results
+         (scan.type == "trivy-scan") &&
+         (builtins.length scan.results == 3) &&
+         (scan.aggregated ? totalImages) &&
+         (scan.riskAssessment ? overallRisk) &&
+         (scan.statistics ? scannedImages);
+     expected = true;
+   };
+
+   # Test 36: Security Scanning - Snyk Dependency Scanning
+   testSecurityScanningSnyk = {
+     name = "security scanning snyk dependencies";
+     test =
+       let
+         manifests = [
+           { "package.json" = {}; }
+           { "Pipfile" = {}; }
+         ];
+         scan = securityScanning.snykScan { inherit manifests; };
+       in
+         # Should create valid snyk scan results
+         (scan.type == "snyk-scan") &&
+         (builtins.length scan.results == 2) &&
+         (scan.aggregated ? totalManifests) &&
+         (scan.riskAssessment ? remediationPossible) &&
+         (scan.statistics ? manifestsScanned);
+     expected = true;
+   };
+
+   # Test 37: Security Scanning - Falco Runtime Monitoring
+   testSecurityScanningFalco = {
+     name = "security scanning falco runtime";
+     test =
+       let
+         rules = {
+           malicious_behavior = [];
+           network_anomaly = [];
+         };
+         monitoring = securityScanning.falcoMonitoring { inherit rules; };
+       in
+         # Should create valid falco configuration
+         (monitoring.type == "falco-monitoring") &&
+         (monitoring.totalRules > 0) &&
+         (monitoring.alerts ? channels) &&
+         (monitoring.deployment ? daemonSetConfig) &&
+         (monitoring.statistics ? totalRules);
+     expected = true;
+   };
+
+   # Test 38: Security Scanning - Orchestration
+   testSecurityScanningOrchestration = {
+     name = "security scanning orchestration";
+     test =
+       let
+         scanConfigs = [
+           { type = "trivy"; target = "images"; }
+           { type = "snyk"; target = "dependencies"; }
+         ];
+         orchestration = securityScanning.securityOrchestration { inherit scanConfigs; };
+       in
+         # Should create valid orchestration pipeline
+         (orchestration.type == "security-orchestration") &&
+         (builtins.length orchestration.pipeline > 0) &&
+         (orchestration.schedule ? cronExpression) &&
+         (orchestration.reporting ? formats) &&
+         (orchestration.complianceTracking ? frameworks);
+     expected = true;
+   };
+
+   # Test 39: Security Scanning - Report Generation
+   testSecurityScanningReport = {
+     name = "security scanning report generation";
+     test =
+       let
+         scans = [
+           {
+             type = "trivy-scan";
+             bySeverity = { critical = []; high = []; medium = []; };
+             aggregated = { critical = []; high = []; };
+           }
+         ];
+         report = securityScanning.generateSecurityReport { inherit scans; };
+       in
+         # Should create valid security report
+         (report.type == "security-report") &&
+         (report.summary ? totalVulnerabilities) &&
+         (report.findings ? CRITICAL || report.findings ? HIGH) &&
+         (report ? recommendations) &&
+         (report ? remediationPlan);
      expected = true;
    };
 }
