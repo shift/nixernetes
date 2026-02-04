@@ -24,6 +24,7 @@ let
   types_module = import ../src/lib/types.nix { inherit lib; };
   generators = import ../src/lib/generators.nix { inherit lib pkgs; };
   costAnalysis = import ../src/lib/cost-analysis.nix { inherit lib; };
+  kyverno = import ../src/lib/kyverno.nix { inherit lib; };
 
   # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -432,6 +433,147 @@ in
         (builtins.any (rec: rec.type == "cpu_oversizing") recommendations) &&
         # Should detect missing limits
         (builtins.any (rec: rec.type == "missing_limit") recommendations);
+    expected = true;
+  };
+
+  # Test 17: Kyverno ClusterPolicy generation
+  testKyvernoClusterPolicyGeneration = {
+    name = "kyverno cluster policy generation";
+    test =
+      let
+        policy = kyverno.mkClusterPolicy {
+          name = "test-policy";
+          description = "Test policy";
+          rules = [
+            (kyverno.mkBlockPrivilegedContainers {})
+          ];
+          validationFailureAction = "enforce";
+        };
+      in
+        # Should create valid Kyverno resource
+        (policy.apiVersion == "kyverno.io/v1") &&
+        (policy.kind == "ClusterPolicy") &&
+        (policy.metadata.name == "test-policy") &&
+        (policy.spec.validationFailureAction == "enforce") &&
+        (builtins.length policy.spec.rules > 0);
+    expected = true;
+  };
+
+  # Test 18: Kyverno Policy generation (namespaced)
+  testKyvernoPolicyGeneration = {
+    name = "kyverno policy generation";
+    test =
+      let
+        policy = kyverno.mkPolicy {
+          name = "test-policy";
+          namespace = "production";
+          description = "Test namespaced policy";
+          rules = [
+            (kyverno.mkRequireResourceLimits {})
+          ];
+          validationFailureAction = "audit";
+        };
+      in
+        # Should create valid Kyverno Policy resource
+        (policy.apiVersion == "kyverno.io/v1") &&
+        (policy.kind == "Policy") &&
+        (policy.metadata.name == "test-policy") &&
+        (policy.metadata.namespace == "production") &&
+        (policy.spec.validationFailureAction == "audit");
+    expected = true;
+  };
+
+  # Test 19: Kyverno security patterns
+  testKyvernoSecurityPatterns = {
+    name = "kyverno security patterns";
+    test =
+      let
+        requireRegistry = kyverno.mkRequireImageRegistry {
+          registry = "gcr.io";
+        };
+        requireLimits = kyverno.mkRequireResourceLimits {};
+        requireSecContext = kyverno.mkRequireSecurityContext {};
+        blockPriv = kyverno.mkBlockPrivilegedContainers {};
+      in
+        # All patterns should have name and validation/generation
+        (requireRegistry ? name) &&
+        (requireLimits ? name) &&
+        (requireSecContext ? name) &&
+        (blockPriv ? name) &&
+        # Should be properly structured
+        (builtins.length (lib.attrNames requireRegistry) > 0) &&
+        (builtins.length (lib.attrNames requireLimits) > 0) &&
+        (builtins.length (lib.attrNames requireSecContext) > 0) &&
+        (builtins.length (lib.attrNames blockPriv) > 0);
+    expected = true;
+  };
+
+  # Test 20: Kyverno mutation and generation patterns
+  testKyvernoMutationGeneration = {
+    name = "kyverno mutation and generation patterns";
+    test =
+      let
+        addLabels = kyverno.mkAddDefaultLabels {
+          labels = { "app" = "test"; };
+        };
+        addImagePullPolicy = kyverno.mkAddImagePullPolicy {};
+        generateNetPolicy = kyverno.mkGenerateNetworkPolicy {};
+      in
+        # All patterns should be properly structured
+        (addLabels ? name) &&
+        (addImagePullPolicy ? name) &&
+        (generateNetPolicy ? name) &&
+        # Should have mutation/generation fields
+        (addLabels ? mutation) &&
+        (addImagePullPolicy ? mutation) &&
+        (generateNetPolicy ? generation);
+    expected = true;
+  };
+
+  # Test 21: Kyverno policy library
+  testKyvernoPolicyLibrary = {
+    name = "kyverno policy library";
+    test =
+      let
+        lib_policies = kyverno.policyLibrary;
+      in
+        # Should have all expected policy sets
+        (lib_policies ? securityBaseline) &&
+        (lib_policies ? complianceSuite) &&
+        (lib_policies ? costOptimization) &&
+        (lib_policies ? bestPractices) &&
+        # Each set should have policies
+        (builtins.length lib_policies.securityBaseline > 0) &&
+        (builtins.length lib_policies.complianceSuite > 0) &&
+        (builtins.length lib_policies.costOptimization > 0) &&
+        (builtins.length lib_policies.bestPractices > 0);
+    expected = true;
+  };
+
+  # Test 22: Kyverno policy validation
+  testKyvernoPolicyValidation = {
+    name = "kyverno policy validation";
+    test =
+      let
+        policy = kyverno.mkClusterPolicy {
+          name = "test-policy";
+          rules = [
+            (kyverno.mkRequireResourceLimits {})
+          ];
+        };
+        resource = {
+          apiVersion = "v1";
+          kind = "Pod";
+          spec.containers = [{
+            resources.limits = {
+              cpu = "500m";
+              memory = "512Mi";
+            };
+          }];
+        };
+      in
+        # Validation should succeed for compliant resource
+        (kyverno.validateAgainstPolicy resource policy) == true;
     expected = true;
   };
 }
