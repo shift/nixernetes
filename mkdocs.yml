@@ -1,0 +1,203 @@
+site_name: Nixernetes - Nix-Driven Kubernetes Framework
+site_description: Enterprise-grade Kubernetes manifest framework with 35 production modules
+site_author: Nixernetes Contributors
+site_url: https://nixernetes.dev
+repo_url: https://github.com/nixernetes/nixernetes
+repo_name: nixernetes/nixernetes
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  logo: assets/logo.png
+  favicon: assets/favicon.ico
+  palette:
+    - scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/lightbulb
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/lightbulb-outline
+        name: Switch to light mode
+  
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Quick Start: getting-started/quick-start.md
+    - Installation: getting-started/installation.md
+    - Your First Deployment: getting-started/first-deployment.md
+    - Troubleshooting: getting-started/troubleshooting.md
+  
+  - Tutorials:
+    - Overview: tutorials/index.md
+    - "1. First Web App": tutorials/tutorial-1.md
+    - "2. Database + API": tutorials/tutorial-2.md
+    - "3. Microservices Stack": tutorials/tutorial-3.md
+  
+  - Examples:
+    - Overview: examples/index.md
+    - "Static Website": examples/static-website.md
+    - "Django App": examples/django-app.md
+    - "Node.js Microservices": examples/nodejs.md
+    - "ML Pipeline": examples/ml-pipeline.md
+    - "Real-Time Chat": examples/chat-app.md
+    - "IoT Pipeline": examples/iot-pipeline.md
+  
+  - Modules:
+    - Overview: modules/index.md
+    - Foundation:
+      - Flakes: modules/foundation/flakes.md
+      - Profiles: modules/foundation/profiles.md
+      - ConfigMaps: modules/foundation/configmaps.md
+      - Labels: modules/foundation/labels.md
+    - Core Kubernetes:
+      - Deployments: modules/core/deployments.md
+      - Services: modules/core/services.md
+      - Ingress: modules/core/ingress.md
+      - Resources: modules/core/resources.md
+      - Scheduling: modules/core/scheduling.md
+    - Security:
+      - RBAC: modules/security/rbac.md
+      - Network Policies: modules/security/network-policies.md
+      - Pod Security: modules/security/pod-security.md
+      - Compliance: modules/security/compliance.md
+      - Security Scanning: modules/security/security-scanning.md
+      - Secrets Management: modules/security/secrets.md
+      - Certificates: modules/security/certificates.md
+      - Audit Logging: modules/security/audit-logging.md
+    - Observability:
+      - Monitoring: modules/observability/monitoring.md
+      - Logging: modules/observability/logging.md
+      - Tracing: modules/observability/tracing.md
+      - Alerting: modules/observability/alerting.md
+      - Dashboards: modules/observability/dashboards.md
+      - Best Practices: modules/observability/best-practices.md
+    - Data & Events:
+      - Databases: modules/data/databases.md
+      - Caching: modules/data/caching.md
+      - Event Processing: modules/data/events.md
+      - Message Queues: modules/data/queues.md
+    - Workloads:
+      - Batch Processing: modules/workloads/batch.md
+      - Machine Learning: modules/workloads/ml.md
+      - Serverless: modules/workloads/serverless.md
+      - Data Processing: modules/workloads/data.md
+    - Operations:
+      - Backups: modules/operations/backups.md
+      - Scaling: modules/operations/scaling.md
+      - Maintenance: modules/operations/maintenance.md
+      - Cost Optimization: modules/operations/cost.md
+
+  - Guides:
+    - Architecture: guides/architecture.md
+    - Performance Tuning: guides/performance.md
+    - Security Hardening: guides/security.md
+    - CLI Reference: guides/cli.md
+    - Best Practices: guides/best-practices.md
+  
+  - Cloud Deployment:
+    - AWS EKS: cloud/aws-eks.md
+    - GCP GKE: cloud/gcp-gke.md
+    - Azure AKS: cloud/azure-aks.md
+  
+  - Community:
+    - Contributing: community/contributing.md
+    - Code of Conduct: community/code-of-conduct.md
+    - GitHub Discussions: community/discussions.md
+    - Release Checklist: community/releases.md
+    - Roadmap: community/roadmap.md
+  
+  - API Reference: api-reference.md
+  - Changelog: changelog.md
+  - FAQ: faq.md
+
+plugins:
+  - search
+  - awesome-pages
+  - minify:
+      minify_js: true
+      minify_css: true
+      minify_html: true
+  - social:
+      cards_layout_options:
+        background_color: "#0D1B3E"
+        color: "#FFFFFF"
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - codehilite:
+      guess_lang: false
+  - def_list
+  - footnotes
+  - md_in_html
+  - meta
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.blocks.admonition
+  - pymdownx.blocks.details
+  - pymdownx.blocks.tab:
+      alternate_style: true
+  - pymdownx.caret
+  - pymdownx.critic
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_generator: pymdownx.emoji.to_svg
+      emoji_index: pymdownx.emoji.twemoji
+  - pymdownx.highlight:
+      use_pygments: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.progressbar
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - tables
+  - toc:
+      permalink: true
+      permalink_class: headerlink
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/nixernetes/nixernetes
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/nixernetes
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/nixernetes
+
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX  # Replace with your Google Analytics ID
+
+extra_css:
+  - assets/stylesheets/extra.css
+
+extra_javascript:
+  - assets/javascripts/extra.js
