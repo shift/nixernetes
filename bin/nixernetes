@@ -10,6 +10,8 @@ import json
 import os
 from pathlib import Path
 from typing import Optional, Dict, Any, List
+import textwrap
+import re
 
 class NixernetesCommand:
     """Base class for Nixernetes commands"""
@@ -311,6 +313,996 @@ class DocsCommand(NixernetesCommand):
             print(f"\nRun 'nixernetes docs MODULE_NAME' to view module documentation")
 
 
+class TemplateCommand(NixernetesCommand):
+    """Interactive template generator for common deployment patterns"""
+    
+    TEMPLATES = {
+        "web": {
+            "description": "Web application (Nginx, Node.js/Django, PostgreSQL)",
+            "components": ["nginx", "nodejs", "postgresql"]
+        },
+        "microservices": {
+            "description": "Microservices architecture (Multiple services, RabbitMQ, Redis)",
+            "components": ["nodejs", "postgresql", "rabbitmq", "redis"]
+        },
+        "ml": {
+            "description": "ML Pipeline (Jupyter, TensorFlow, MLflow, MinIO)",
+            "components": ["jupyter", "tensorflow", "mlflow", "minio"]
+        },
+        "realtime": {
+            "description": "Real-time chat (WebSocket, React, Node.js, PostgreSQL)",
+            "components": ["react", "nodejs", "postgresql", "redis"]
+        },
+        "iot": {
+            "description": "IoT Data Pipeline (MQTT, TimescaleDB, Kafka, Grafana)",
+            "components": ["mosquitto", "timescaledb", "kafka", "grafana"]
+        },
+        "minimal": {
+            "description": "Minimal deployment (Single container)",
+            "components": ["container"]
+        }
+    }
+    
+    def run(self, args):
+        """Generate configuration from template"""
+        template_name = args.template
+        
+        if template_name == "list":
+            self._list_templates()
+            return
+        
+        if not template_name or template_name not in self.TEMPLATES:
+            self._list_templates()
+            sys.exit(1)
+        
+        template = self.TEMPLATES[template_name]
+        output_file = args.output or f"config-{template_name}.nix"
+        
+        print(f"Generating '{template_name}' template...")
+        print(f"Template: {template['description']}")
+        
+        config = self._generate_config(template_name, template)
+        
+        # Write to file
+        output_path = Path(output_file)
+        output_path.write_text(config)
+        
+        print(f"\n✓ Generated {output_file}")
+        print(f"  Components: {', '.join(template['components'])}")
+        print(f"\nNext steps:")
+        print(f"  1. Review {output_file}")
+        print(f"  2. Customize as needed")
+        print(f"  3. Run: nixernetes deploy --config {output_file}")
+    
+    def _list_templates(self):
+        """List available templates"""
+        print("Available templates:\n")
+        for name, info in self.TEMPLATES.items():
+            print(f"  {name:<15} - {info['description']}")
+            print(f"  {' '*15}   Components: {', '.join(info['components'])}\n")
+        print("Usage: nixernetes template TEMPLATE_NAME [--output FILE]")
+    
+    def _generate_config(self, template_name: str, template: Dict) -> str:
+        """Generate Nix configuration for template"""
+        if template_name == "web":
+            return self._template_web()
+        elif template_name == "microservices":
+            return self._template_microservices()
+        elif template_name == "ml":
+            return self._template_ml()
+        elif template_name == "realtime":
+            return self._template_realtime()
+        elif template_name == "iot":
+            return self._template_iot()
+        elif template_name == "minimal":
+            return self._template_minimal()
+        return ""
+    
+    @staticmethod
+    def _template_minimal() -> str:
+        return '''{ lib }:
+
+# Minimal Nixernetes deployment
+{
+  deployment = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = {
+      name = "my-app";
+      namespace = "default";
+    };
+    spec = {
+      replicas = 1;
+      selector.matchLabels.app = "my-app";
+      template = {
+        metadata.labels.app = "my-app";
+        spec.containers = [{
+          name = "app";
+          image = "nginx:latest";
+          ports = [{ containerPort = 80; }];
+          resources = {
+            requests = { memory = "64Mi"; cpu = "50m"; };
+            limits = { memory = "128Mi"; cpu = "100m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  service = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = {
+      name = "my-app";
+      namespace = "default";
+    };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "my-app";
+      ports = [{ port = 80; targetPort = 80; }];
+    };
+  };
+}
+'''
+    
+    @staticmethod
+    def _template_web() -> str:
+        return '''{ lib }:
+
+# Web application stack: Nginx + Node.js/Django + PostgreSQL
+{
+  # PostgreSQL Database
+  database = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector = { app = "postgres"; };
+      ports = [{ port = 5432; targetPort = 5432; }];
+    };
+  };
+  
+  postgresDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      serviceName = "postgres";
+      replicas = 1;
+      selector.matchLabels.app = "postgres";
+      template = {
+        metadata.labels.app = "postgres";
+        spec = {
+          containers = [{
+            name = "postgres";
+            image = "postgres:15-alpine";
+            ports = [{ containerPort = 5432; }];
+            env = [
+              { name = "POSTGRES_PASSWORD"; value = "changeme"; }
+            ];
+            volumeMounts = [{
+              name = "data";
+              mountPath = "/var/lib/postgresql/data";
+            }];
+            resources = {
+              requests = { memory = "256Mi"; cpu = "100m"; };
+              limits = { memory = "512Mi"; cpu = "500m"; };
+            };
+          }];
+          volumes = [{
+            name = "data";
+            persistentVolumeClaim.claimName = "postgres-data";
+          }];
+        };
+      };
+    };
+  };
+  
+  postgresPVC = {
+    apiVersion = "v1";
+    kind = "PersistentVolumeClaim";
+    metadata = { name = "postgres-data"; namespace = "default"; };
+    spec = {
+      accessModes = ["ReadWriteOnce"];
+      resources.requests.storage = "10Gi";
+    };
+  };
+  
+  # Backend Application
+  backend = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "backend"; namespace = "default"; };
+    spec = {
+      replicas = 2;
+      selector.matchLabels.app = "backend";
+      template = {
+        metadata.labels.app = "backend";
+        spec = {
+          containers = [{
+            name = "app";
+            image = "node:18-alpine";
+            ports = [{ containerPort = 3000; }];
+            env = [
+              { name = "DATABASE_URL"; value = "postgresql://user:password@postgres:5432/app"; }
+              { name = "NODE_ENV"; value = "production"; }
+            ];
+            livenessProbe = {
+              httpGet = { path = "/health"; port = 3000; };
+              initialDelaySeconds = 30;
+              periodSeconds = 10;
+            };
+            resources = {
+              requests = { memory = "128Mi"; cpu = "100m"; };
+              limits = { memory = "256Mi"; cpu = "500m"; };
+            };
+          }];
+        };
+      };
+    };
+  };
+  
+  backendService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "backend"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "backend";
+      ports = [{ port = 3000; targetPort = 3000; }];
+    };
+  };
+  
+  # Nginx Frontend
+  frontend = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "nginx"; namespace = "default"; };
+    spec = {
+      replicas = 2;
+      selector.matchLabels.app = "nginx";
+      template = {
+        metadata.labels.app = "nginx";
+        spec = {
+          containers = [{
+            name = "nginx";
+            image = "nginx:alpine";
+            ports = [{ containerPort = 80; }];
+            resources = {
+              requests = { memory = "64Mi"; cpu = "50m"; };
+              limits = { memory = "128Mi"; cpu = "200m"; };
+            };
+          }];
+        };
+      };
+    };
+  };
+  
+  frontendService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "nginx"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "nginx";
+      ports = [{ port = 80; targetPort = 80; }];
+    };
+  };
+}
+'''
+    
+    @staticmethod
+    def _template_microservices() -> str:
+        return '''{ lib }:
+
+# Microservices architecture
+{
+  # RabbitMQ Message Broker
+  rabbitmq = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "rabbitmq"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "rabbitmq";
+      ports = [
+        { name = "amqp"; port = 5672; targetPort = 5672; }
+        { name = "management"; port = 15672; targetPort = 15672; }
+      ];
+    };
+  };
+  
+  rabbitmqDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "rabbitmq"; namespace = "default"; };
+    spec = {
+      serviceName = "rabbitmq";
+      replicas = 1;
+      selector.matchLabels.app = "rabbitmq";
+      template = {
+        metadata.labels.app = "rabbitmq";
+        spec.containers = [{
+          name = "rabbitmq";
+          image = "rabbitmq:3.12-alpine";
+          ports = [
+            { containerPort = 5672; }
+            { containerPort = 15672; }
+          ];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "100m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # Redis Cache
+  redis = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "redis"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "redis";
+      ports = [{ port = 6379; targetPort = 6379; }];
+    };
+  };
+  
+  redisDeployment = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "redis"; namespace = "default"; };
+    spec = {
+      replicas = 1;
+      selector.matchLabels.app = "redis";
+      template = {
+        metadata.labels.app = "redis";
+        spec.containers = [{
+          name = "redis";
+          image = "redis:7-alpine";
+          ports = [{ containerPort = 6379; }];
+          resources = {
+            requests = { memory = "128Mi"; cpu = "100m"; };
+            limits = { memory = "256Mi"; cpu = "200m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # PostgreSQL Database
+  postgres = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "postgres";
+      ports = [{ port = 5432; targetPort = 5432; }];
+    };
+  };
+  
+  postgresDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      serviceName = "postgres";
+      replicas = 1;
+      selector.matchLabels.app = "postgres";
+      template = {
+        metadata.labels.app = "postgres";
+        spec = {
+          containers = [{
+            name = "postgres";
+            image = "postgres:15-alpine";
+            ports = [{ containerPort = 5432; }];
+            env = [
+              { name = "POSTGRES_PASSWORD"; value = "changeme"; }
+            ];
+            resources = {
+              requests = { memory = "256Mi"; cpu = "100m"; };
+              limits = { memory = "512Mi"; cpu = "500m"; };
+            };
+          }];
+        };
+      };
+    };
+  };
+  
+  # API Gateway
+  apiGateway = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "api-gateway"; namespace = "default"; };
+    spec = {
+      replicas = 2;
+      selector.matchLabels.app = "api-gateway";
+      template = {
+        metadata.labels.app = "api-gateway";
+        spec.containers = [{
+          name = "app";
+          image = "node:18-alpine";
+          ports = [{ containerPort = 3000; }];
+          env = [
+            { name = "NODE_ENV"; value = "production"; }
+          ];
+          resources = {
+            requests = { memory = "128Mi"; cpu = "100m"; };
+            limits = { memory = "256Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  apiGatewayService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "api-gateway"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "api-gateway";
+      ports = [{ port = 80; targetPort = 3000; }];
+    };
+  };
+}
+'''
+    
+    @staticmethod
+    def _template_ml() -> str:
+        return '''{ lib }:
+
+# Machine Learning Pipeline
+{
+  # Jupyter Lab
+  jupyter = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "jupyter"; namespace = "default"; };
+    spec = {
+      serviceName = "jupyter";
+      replicas = 1;
+      selector.matchLabels.app = "jupyter";
+      template = {
+        metadata.labels.app = "jupyter";
+        spec = {
+          containers = [{
+            name = "jupyter";
+            image = "jupyter/datascience-notebook:latest";
+            ports = [{ containerPort = 8888; }];
+            resources = {
+              requests = { memory = "2Gi"; cpu = "1000m"; };
+              limits = { memory = "4Gi"; cpu = "2000m"; };
+            };
+          }];
+        };
+      };
+    };
+  };
+  
+  jupyterService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "jupyter"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "jupyter";
+      ports = [{ port = 8888; targetPort = 8888; }];
+    };
+  };
+  
+  # PostgreSQL for metadata
+  postgres = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "postgres";
+      ports = [{ port = 5432; targetPort = 5432; }];
+    };
+  };
+  
+  postgresDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      serviceName = "postgres";
+      replicas = 1;
+      selector.matchLabels.app = "postgres";
+      template = {
+        metadata.labels.app = "postgres";
+        spec.containers = [{
+          name = "postgres";
+          image = "postgres:15-alpine";
+          ports = [{ containerPort = 5432; }];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "100m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # Training Job (CronJob)
+  trainingJob = {
+    apiVersion = "batch/v1";
+    kind = "CronJob";
+    metadata = { name = "ml-training"; namespace = "default"; };
+    spec = {
+      schedule = "0 2 * * *";
+      jobTemplate.spec.template.spec = {
+        containers = [{
+          name = "trainer";
+          image = "tensorflow/tensorflow:latest";
+          resources = {
+            requests = { memory = "4Gi"; cpu = "2000m"; };
+            limits = { memory = "8Gi"; cpu = "4000m"; };
+          };
+        }];
+        restartPolicy = "OnFailure";
+      };
+    };
+  };
+}
+'''
+    
+    @staticmethod
+    def _template_realtime() -> str:
+        return '''{ lib }:
+
+# Real-time Chat Application
+{
+  # PostgreSQL Database
+  postgres = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "postgres";
+      ports = [{ port = 5432; targetPort = 5432; }];
+    };
+  };
+  
+  postgresDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "postgres"; namespace = "default"; };
+    spec = {
+      serviceName = "postgres";
+      replicas = 1;
+      selector.matchLabels.app = "postgres";
+      template = {
+        metadata.labels.app = "postgres";
+        spec.containers = [{
+          name = "postgres";
+          image = "postgres:15-alpine";
+          ports = [{ containerPort = 5432; }];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "100m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # Redis for sessions
+  redis = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "redis"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "redis";
+      ports = [{ port = 6379; targetPort = 6379; }];
+    };
+  };
+  
+  redisDeployment = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "redis"; namespace = "default"; };
+    spec = {
+      replicas = 1;
+      selector.matchLabels.app = "redis";
+      template = {
+        metadata.labels.app = "redis";
+        spec.containers = [{
+          name = "redis";
+          image = "redis:7-alpine";
+          ports = [{ containerPort = 6379; }];
+          resources = {
+            requests = { memory = "128Mi"; cpu = "100m"; };
+            limits = { memory = "256Mi"; cpu = "200m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # Chat Server
+  chatServer = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "chat-server"; namespace = "default"; };
+    spec = {
+      replicas = 3;
+      selector.matchLabels.app = "chat-server";
+      template = {
+        metadata.labels.app = "chat-server";
+        spec.containers = [{
+          name = "app";
+          image = "node:18-alpine";
+          ports = [{ containerPort = 4000; }];
+          env = [
+            { name = "DATABASE_URL"; value = "postgresql://user:password@postgres:5432/chat"; }
+            { name = "REDIS_URL"; value = "redis://redis:6379"; }
+          ];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "100m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  chatServerService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "chat-server"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "chat-server";
+      ports = [{ port = 4000; targetPort = 4000; }];
+      sessionAffinity = "ClientIP";
+    };
+  };
+  
+  # Frontend (Nginx)
+  frontend = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "frontend"; namespace = "default"; };
+    spec = {
+      replicas = 2;
+      selector.matchLabels.app = "frontend";
+      template = {
+        metadata.labels.app = "frontend";
+        spec.containers = [{
+          name = "nginx";
+          image = "nginx:alpine";
+          ports = [{ containerPort = 80; }];
+          resources = {
+            requests = { memory = "64Mi"; cpu = "50m"; };
+            limits = { memory = "128Mi"; cpu = "200m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  frontendService = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "frontend"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "frontend";
+      ports = [{ port = 80; targetPort = 80; }];
+    };
+  };
+}
+'''
+    
+    @staticmethod
+    def _template_iot() -> str:
+        return '''{ lib }:
+
+# IoT Data Pipeline
+{
+  # MQTT Broker
+  mqtt = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "mqtt-broker"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "mqtt-broker";
+      ports = [
+        { name = "mqtt"; port = 1883; targetPort = 1883; }
+        { name = "websockets"; port = 9001; targetPort = 9001; }
+      ];
+    };
+  };
+  
+  mqttDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "mqtt-broker"; namespace = "default"; };
+    spec = {
+      serviceName = "mqtt-broker";
+      replicas = 2;
+      selector.matchLabels.app = "mqtt-broker";
+      template = {
+        metadata.labels.app = "mqtt-broker";
+        spec.containers = [{
+          name = "mosquitto";
+          image = "eclipse-mosquitto:latest";
+          ports = [
+            { containerPort = 1883; }
+            { containerPort = 9001; }
+          ];
+          resources = {
+            requests = { memory = "128Mi"; cpu = "100m"; };
+            limits = { memory = "256Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # TimescaleDB (PostgreSQL with time-series support)
+  timescaledb = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "timescaledb"; namespace = "default"; };
+    spec = {
+      type = "ClusterIP";
+      selector.app = "timescaledb";
+      ports = [{ port = 5432; targetPort = 5432; }];
+    };
+  };
+  
+  timescaledbDeployment = {
+    apiVersion = "apps/v1";
+    kind = "StatefulSet";
+    metadata = { name = "timescaledb"; namespace = "default"; };
+    spec = {
+      serviceName = "timescaledb";
+      replicas = 1;
+      selector.matchLabels.app = "timescaledb";
+      template = {
+        metadata.labels.app = "timescaledb";
+        spec = {
+          containers = [{
+            name = "timescaledb";
+            image = "timescale/timescaledb:latest";
+            ports = [{ containerPort = 5432; }];
+            env = [
+              { name = "POSTGRES_PASSWORD"; value = "changeme"; }
+            ];
+            resources = {
+              requests = { memory = "512Mi"; cpu = "250m"; };
+              limits = { memory = "2Gi"; cpu = "1000m"; };
+            };
+          }];
+        };
+      };
+    };
+  };
+  
+  # Grafana Dashboard
+  grafana = {
+    apiVersion = "v1";
+    kind = "Service";
+    metadata = { name = "grafana"; namespace = "default"; };
+    spec = {
+      type = "LoadBalancer";
+      selector.app = "grafana";
+      ports = [{ port = 80; targetPort = 3000; }];
+    };
+  };
+  
+  grafanaDeployment = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "grafana"; namespace = "default"; };
+    spec = {
+      replicas = 1;
+      selector.matchLabels.app = "grafana";
+      template = {
+        metadata.labels.app = "grafana";
+        spec.containers = [{
+          name = "grafana";
+          image = "grafana/grafana:latest";
+          ports = [{ containerPort = 3000; }];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "100m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+  
+  # Data Ingestion Service
+  ingestion = {
+    apiVersion = "apps/v1";
+    kind = "Deployment";
+    metadata = { name = "iot-ingest"; namespace = "default"; };
+    spec = {
+      replicas = 3;
+      selector.matchLabels.app = "iot-ingest";
+      template = {
+        metadata.labels.app = "iot-ingest";
+        spec.containers = [{
+          name = "ingest";
+          image = "node:18-alpine";
+          env = [
+            { name = "MQTT_BROKER"; value = "mqtt-broker:1883"; }
+            { name = "TIMESCALE_URL"; value = "postgresql://user:password@timescaledb:5432/iot"; }
+          ];
+          resources = {
+            requests = { memory = "256Mi"; cpu = "200m"; };
+            limits = { memory = "512Mi"; cpu = "500m"; };
+          };
+        }];
+      };
+    };
+  };
+}
+'''
+
+
+class GenerateCommand2(NixernetesCommand):
+    """Generate new project boilerplate"""
+    
+    def run(self, args):
+        """Generate project structure"""
+        project_name = args.name or "my-nixernetes-project"
+        template = args.template or "minimal"
+        
+        print(f"Generating project boilerplate: {project_name}")
+        print(f"Template: {template}")
+        
+        project_dir = Path(project_name)
+        project_dir.mkdir(exist_ok=True)
+        
+        # Create directory structure
+        (project_dir / "config").mkdir(exist_ok=True)
+        (project_dir / "src").mkdir(exist_ok=True)
+        (project_dir / "tests").mkdir(exist_ok=True)
+        
+        # Create .envrc
+        (project_dir / ".envrc").write_text("use flake\n")
+        
+        # Create flake.nix
+        flake = self._generate_flake()
+        (project_dir / "flake.nix").write_text(flake)
+        
+        # Create main config
+        if template in TemplateCommand.TEMPLATES:
+            cmd = TemplateCommand()
+            config = cmd._generate_config(template, TemplateCommand.TEMPLATES[template])
+            (project_dir / "config" / "main.nix").write_text(config)
+        
+        # Create README
+        readme = self._generate_readme(project_name)
+        (project_dir / "README.md").write_text(readme)
+        
+        # Create .gitignore
+        gitignore = self._generate_gitignore()
+        (project_dir / ".gitignore").write_text(gitignore)
+        
+        print(f"\n✓ Project boilerplate created in {project_dir}")
+        print(f"\nNext steps:")
+        print(f"  cd {project_name}")
+        print(f"  direnv allow")
+        print(f"  nix flake update")
+        print(f"  nixernetes deploy --config config/main.nix")
+    
+    @staticmethod
+    def _generate_flake() -> str:
+        return '''{ description = "Nixernetes Project";
+
+  inputs = {
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
+  };
+
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        pkgs = nixpkgs.legacyPackages.${system};
+      in
+      {
+        devShells.default = pkgs.mkShell {
+          buildInputs = with pkgs; [
+            nix
+            nixpkgs-fmt
+            kubectl
+            kubernetes-helm
+            jq
+            yq
+          ];
+        };
+      }
+    );
+}
+'''
+    
+    @staticmethod
+    def _generate_readme(project_name: str) -> str:
+        return f'''# {project_name}
+
+Nixernetes project for {project_name}.
+
+## Quick Start
+
+```bash
+# Setup environment
+direnv allow
+nix flake update
+
+# Validate configuration
+nixernetes validate
+
+# Generate Kubernetes manifests
+nixernetes generate --config config/main.nix
+
+# Deploy to cluster
+nixernetes deploy --config config/main.nix --dry-run
+
+# Actual deployment
+nixernetes deploy --config config/main.nix
+```
+
+## Project Structure
+
+```
+{project_name}/
+├── config/
+│   └── main.nix          # Main configuration
+├── src/
+│   └── modules/          # Custom modules
+├── tests/
+│   └── ...               # Test files
+├── flake.nix             # Nix flake definition
+└── README.md             # This file
+```
+
+## Commands
+
+- `nixernetes validate` - Validate configuration
+- `nixernetes generate` - Generate YAML manifests
+- `nixernetes deploy` - Deploy to Kubernetes cluster
+- `nixernetes list` - List available modules
+- `nixernetes docs MODULE` - View module documentation
+
+## Documentation
+
+See the [Nixernetes documentation](https://github.com/nixernetes/nixernetes/blob/main/README.md) for more information.
+'''
+    
+    @staticmethod
+    def _generate_gitignore() -> str:
+        return '''/result
+/result-*
+*.out
+*.yaml
+*.json
+*.swp
+*.swo
+*~
+.DS_Store
+.idea/
+.vscode/
+node_modules/
+__pycache__/
+*.pyc
+.envrc.local
+'''
+
+
 def main():
     """Main CLI entry point"""
     parser = argparse.ArgumentParser(
@@ -319,9 +1311,11 @@ def main():
         epilog="""
 Examples:
   nixernetes validate                    # Validate configuration
-  nixernetes init my-project             # Create new project
-  nixernetes generate                    # Generate YAML
+  nixernetes init my-project             # Create new project with template
+  nixernetes template web                # Generate web app template
+  nixernetes generate                    # Generate YAML manifests
   nixernetes deploy --dry-run            # Test deployment
+  nixernetes generate-project my-app     # Create project boilerplate
   nixernetes list                        # List modules
   nixernetes docs BATCH_PROCESSING       # View module docs
         """
@@ -336,10 +1330,20 @@ Examples:
     init_parser = subparsers.add_parser("init", help="Initialize new project")
     init_parser.add_argument("name", nargs="?", help="Project name")
     
+    # Template command
+    template_parser = subparsers.add_parser("template", help="Generate configuration template")
+    template_parser.add_argument("template", nargs="?", help="Template name (or 'list')")
+    template_parser.add_argument("--output", "-o", help="Output file")
+    
     # Generate command
-    gen_parser = subparsers.add_parser("generate", help="Generate YAML")
+    gen_parser = subparsers.add_parser("generate", help="Generate YAML manifests")
     gen_parser.add_argument("--config", "-c", help="Config file")
     gen_parser.add_argument("--output", "-o", help="Output file")
+    
+    # Generate-project command
+    genpro_parser = subparsers.add_parser("generate-project", help="Generate project boilerplate")
+    genpro_parser.add_argument("name", help="Project name")
+    genpro_parser.add_argument("--template", "-t", help="Template name")
     
     # Deploy command
     deploy_parser = subparsers.add_parser("deploy", help="Deploy to cluster")
@@ -367,7 +1371,9 @@ Examples:
     commands = {
         "validate": ValidateCommand,
         "init": InitCommand,
+        "template": TemplateCommand,
         "generate": GenerateCommand,
+        "generate-project": GenerateCommand2,
         "deploy": DeployCommand,
         "test": TestCommand,
         "list": ListCommand,
