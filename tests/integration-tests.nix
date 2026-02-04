@@ -32,6 +32,7 @@ let
     unifiedApi = import ../src/lib/unified-api.nix { inherit lib; };
      policyTesting = import ../src/lib/policy-testing.nix { inherit lib; };
      helmIntegration = import ../src/lib/helm-integration.nix { inherit lib; };
+     advancedOrchestration = import ../src/lib/advanced-orchestration.nix { inherit lib; };
  
    # Helper to check if a resource has expected labels
   hasLabels = resource: expectedLabels:
@@ -1719,6 +1720,227 @@ in
            (framework.features ? "dependency-management") &&
            (framework.features ? "unified-api-integration") &&
            (builtins.elem "3.10+" framework.supportedHelmVersions) &&
+           (builtins.elem "1.28" framework.supportedKubernetesVersions);
+       expected = true;
+     };
+
+     # Test 71: Advanced Orchestration - Workload Affinity Policy
+     testAdvancedOrchestrationAffinityPolicy = {
+       name = "advanced orchestration affinity policy";
+       test =
+         let
+           policy = advancedOrchestration.mkWorkloadAffinityPolicy "test-affinity" {
+             podAffinityPresets = ["web" "cache"];
+             nodeAffinityRules = [];
+             antiAffinityStrength = "soft";
+             topologyKey = "kubernetes.io/hostname";
+             spreadKey = "topology.kubernetes.io/zone";
+           };
+         in
+           # Should create valid affinity policy
+           (policy.name == "test-affinity") &&
+           (policy.antiAffinityStrength == "soft") &&
+           (builtins.length policy.podAffinityPresets == 2) &&
+           (policy.topologyKey == "kubernetes.io/hostname");
+       expected = true;
+     };
+
+     # Test 72: Advanced Orchestration - Pod Disruption Budget
+     testAdvancedOrchestrationPDB = {
+       name = "advanced orchestration pod disruption budget";
+       test =
+         let
+           pdb = advancedOrchestration.mkPodDisruptionBudget "test-pdb" {
+             namespace = "production";
+             selector = { matchLabels = { app = "test"; }; };
+             minAvailable = 2;
+             maxUnavailable = 1;
+             unhealthyPodEvictionPolicy = "IfHealthyBudget";
+           };
+         in
+           # Should create valid PDB
+           (pdb.name == "test-pdb") &&
+           (pdb.namespace == "production") &&
+           (pdb.minAvailable == 2) &&
+           (pdb.maxUnavailable == 1) &&
+           (pdb.unhealthyPodEvictionPolicy == "IfHealthyBudget");
+       expected = true;
+     };
+
+     # Test 73: Advanced Orchestration - Priority Classes
+     testAdvancedOrchestrationPriorityClass = {
+       name = "advanced orchestration priority class";
+       test =
+         let
+           highPriority = advancedOrchestration.mkPriorityClass "high" {
+             value = 1000;
+             globalDefault = false;
+             description = "High priority";
+             preemptionPolicy = "PreemptLowerPriority";
+           };
+           
+           lowPriority = advancedOrchestration.mkPriorityClass "low" {
+             value = 100;
+             preemptionPolicy = "Never";
+           };
+         in
+           # Should create valid priority classes
+           (highPriority.name == "high") &&
+           (highPriority.value == 1000) &&
+           (highPriority.preemptionPolicy == "PreemptLowerPriority") &&
+           (lowPriority.value == 100) &&
+           (lowPriority.preemptionPolicy == "Never");
+       expected = true;
+     };
+
+     # Test 74: Advanced Orchestration - Multi-Cluster Policy
+     testAdvancedOrchestrationMultiCluster = {
+       name = "advanced orchestration multi-cluster policy";
+       test =
+         let
+           policy = advancedOrchestration.mkMultiClusterPolicy "global-app" {
+             clusters = ["us-east-1" "us-west-1" "eu-west-1"];
+             distribution = "cost-optimized";
+             weights = {
+               "us-east-1" = 0.5;
+               "us-west-1" = 0.3;
+               "eu-west-1" = 0.2;
+             };
+             failoverChain = ["us-east-1" "us-west-1" "eu-west-1"];
+             preferredRegions = ["us"];
+             costOptimization = true;
+             latencyThreshold = 100;
+           };
+           
+           validation = advancedOrchestration.validateMultiClusterPolicy policy;
+         in
+           # Should create valid multi-cluster policy
+           (policy.name == "global-app") &&
+           (builtins.length policy.clusters == 3) &&
+           (policy.distribution == "cost-optimized") &&
+           (policy.costOptimization == true) &&
+           (policy.weights ? "us-east-1") &&
+           (validation.valid == true);
+       expected = true;
+     };
+
+     # Test 75: Advanced Orchestration - Capacity Planner
+     testAdvancedOrchestrationCapacityPlanner = {
+       name = "advanced orchestration capacity planner";
+       test =
+         let
+           planner = advancedOrchestration.mkCapacityPlanner "prod-cluster" {
+             clusterName = "production";
+             currentCapacity = {
+               nodes = 10;
+               cpuPerNode = "16";
+               memoryPerNode = "32Gi";
+               storagePerNode = "200Gi";
+             };
+             currentUtilization = {
+               cpu = 0.65;
+               memory = 0.72;
+               storage = 0.55;
+             };
+             forecastingPeriod = 90;
+             targetUtilization = {
+               cpu = 0.70;
+               memory = 0.75;
+               storage = 0.80;
+             };
+             growthRate = 0.12;
+           };
+         in
+           # Should create valid capacity planner
+           (planner.clusterName == "production") &&
+           (planner.currentCapacity.nodes == 10) &&
+           (planner.currentUtilization.cpu == 0.65) &&
+           (planner.forecastingPeriod == 90) &&
+           (planner.growthRate == 0.12);
+       expected = true;
+     };
+
+     # Test 76: Advanced Orchestration - Resource Optimizer
+     testAdvancedOrchestrationResourceOptimizer = {
+       name = "advanced orchestration resource optimizer";
+       test =
+         let
+           optimizer = advancedOrchestration.mkResourceOptimizer "api-server" {
+             workloadName = "api-server";
+             workloadType = "deployment";
+             analysisWindow = 30;
+             recommendationType = "balanced";
+             vpaRecommendations = {
+               enabled = true;
+               updateMode = "Auto";
+               minAllowedResources = { cpu = "100m"; memory = "128Mi"; };
+               maxAllowedResources = { cpu = "4"; memory = "8Gi"; };
+             };
+             hpaRecommendations = {
+               enabled = true;
+               metric = "cpu";
+               targetValue = 70;
+               minReplicas = 2;
+               maxReplicas = 20;
+             };
+           };
+         in
+           # Should create valid resource optimizer
+           (optimizer.workloadName == "api-server") &&
+           (optimizer.workloadType == "deployment") &&
+           (optimizer.analysisWindow == 30) &&
+           (optimizer.vpaRecommendations.enabled == true) &&
+           (optimizer.hpaRecommendations.targetValue == 70);
+       expected = true;
+     };
+
+     # Test 77: Advanced Orchestration - Topology Strategy
+     testAdvancedOrchestrationTopologyStrategy = {
+       name = "advanced orchestration topology strategy";
+       test =
+         let
+           strategy = advancedOrchestration.mkTopologyStrategy "zone-spread" {
+             strategyType = "zone-spread";
+             dimensions = ["topology.kubernetes.io/zone"];
+             skewLimit = 1;
+             minDomains = 3;
+             nodeAffinityPolicy = "Honor";
+             nodeTaintsPolicy = "Honor";
+             topology = {
+               "us-east-1a" = 3;
+               "us-east-1b" = 3;
+               "us-east-1c" = 3;
+             };
+           };
+         in
+           # Should create valid topology strategy
+           (strategy.name == "zone-spread") &&
+           (strategy.strategyType == "zone-spread") &&
+           (builtins.length strategy.dimensions == 1) &&
+           (strategy.skewLimit == 1) &&
+           (strategy.minDomains == 3) &&
+           (strategy.topology ? "us-east-1a");
+       expected = true;
+     };
+
+     # Test 78: Advanced Orchestration - Framework Information
+     testAdvancedOrchestrationFrameworkInfo = {
+       name = "advanced orchestration framework information";
+       test =
+         let
+           framework = advancedOrchestration.framework;
+         in
+           # Should provide framework metadata
+           (framework.name == "Nixernetes Advanced Orchestration") &&
+           (framework.version == "1.0.0") &&
+           (framework.features ? "workload-affinity") &&
+           (framework.features ? "pod-disruption-budgets") &&
+           (framework.features ? "priority-classes") &&
+           (framework.features ? "multi-cluster-distribution") &&
+           (framework.features ? "capacity-planning") &&
+           (framework.features ? "resource-optimization") &&
+           (framework.features ? "topology-aware-scheduling") &&
+           (builtins.elem "cost-optimized" framework.supportedStrategies) &&
            (builtins.elem "1.28" framework.supportedKubernetesVersions);
        expected = true;
      };
