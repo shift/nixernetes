@@ -1,4 +1,4 @@
-name: Deployment Notifications
+name: Deploy Notify
 
 on:
   workflow_dispatch:
