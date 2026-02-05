@@ -1,9 +1,6 @@
 name: Deployment Notifications
 
 on:
-  workflow_run:
-    workflows: ["Release"]
-    types: [completed]
   workflow_dispatch:
     inputs:
       environment:
