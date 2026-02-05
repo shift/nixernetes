@@ -14,31 +14,54 @@ on:
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  deploy:
+  build-docs:
+    name: Build Documentation
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      
+
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
           cache: 'pip'
-      
-      - run: pip install mkdocs mkdocs-material mkdocs-awesome-pages pymdown-extensions
-      
+
+      - run: pip install mkdocs-material pymdown-extensions
+
       - run: mkdocs build
-      
-      - name: Deploy to GitHub Pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
+
+      - name: Upload documentation artifacts
+        uses: actions/upload-artifact@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          cname: nixernetes.dev
+          name: documentation-site
+          path: ./site
+
+  deploy-docs:
+    name: Deploy to GitHub Pages
+    needs: build-docs
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download documentation artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: documentation-site
+          path: ./site
+
+      - name: Upload to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
