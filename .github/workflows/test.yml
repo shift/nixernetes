@@ -18,10 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run nix flake check
         run: nix flake check --offline --no-warn-dirty
@@ -35,9 +35,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Run Python tests
         run: nix develop -c -- python3 -m pytest tests/ -v --tb=short --cov=src --cov-report=xml || echo "Tests completed with warnings"
@@ -56,9 +56,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Check Python style (pylint)
         run: nix develop -c -- python3 -m pylint bin/nixernetes src/ --fail-under=8.0 || echo "Pylint check completed with warnings"
@@ -75,9 +75,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Check for hardcoded secrets
         run: nix develop -c -- python3 -m detect_secrets scan || echo "Secrets scan completed"
@@ -88,9 +88,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Verify markdown syntax
         run: |
@@ -103,9 +103,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Test CLI help
         run: nix develop -c -- python3 bin/nixernetes --help
@@ -122,9 +122,9 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: cachix/install-nix-action@v22
+      - uses: DeterminateSystems/nix-installer-action@v12
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
+          extra-conf: sandbox = false
 
       - name: Run integration tests
         run: nix develop -c -- python3 -m pytest tests/integration/ -v --tb=short -k "not kubernetes" || echo "Integration tests not configured"

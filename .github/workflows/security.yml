@@ -48,8 +48,8 @@ jobs:
 
       - uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Nix dependencies
         run: |

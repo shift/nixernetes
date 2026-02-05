@@ -20,8 +20,8 @@ jobs:
 
       - uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run nix flake check
         run: nix flake check --no-warn-dirty
@@ -34,8 +34,8 @@ jobs:
 
       - uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build default package
         run: nix build .#default
@@ -51,8 +51,8 @@ jobs:
 
       - uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Check Nix formatting
         run: nixpkgs-fmt --check . || true
@@ -84,8 +84,8 @@ jobs:
 
       - uses: cachix/install-nix-action@v24
         with:
-          nix_path: nixpkgs=channel:nixos-unstable
-          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+          extra-conf: sandbox = false
+          github-access-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Run integration tests
         run: nix flake check
