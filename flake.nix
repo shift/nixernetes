@@ -72,41 +72,48 @@
 
       in
        {
-           packages = {
-             # Library modules (as documentation)
-             lib-schema = pkgs.writeText "lib-schema.nix" (builtins.readFile ./src/lib/schema.nix);
-             lib-compliance = pkgs.writeText "lib-compliance.nix" (builtins.readFile ./src/lib/compliance.nix);
-             lib-policies = pkgs.writeText "lib-policies.nix" (builtins.readFile ./src/lib/policies.nix);
-             lib-output = pkgs.writeText "lib-output.nix" (builtins.readFile ./src/lib/output.nix);
-             lib-types = pkgs.writeText "lib-types.nix" (builtins.readFile ./src/lib/types.nix);
-             lib-validation = pkgs.writeText "lib-validation.nix" (builtins.readFile ./src/lib/validation.nix);
-             lib-generators = pkgs.writeText "lib-generators.nix" (builtins.readFile ./src/lib/generators.nix);
-             lib-compliance-enforcement = pkgs.writeText "lib-compliance-enforcement.nix" (builtins.readFile ./src/lib/compliance-enforcement.nix);
-             lib-compliance-profiles = pkgs.writeText "lib-compliance-profiles.nix" (builtins.readFile ./src/lib/compliance-profiles.nix);
-              lib-policy-generation = pkgs.writeText "lib-policy-generation.nix" (builtins.readFile ./src/lib/policy-generation.nix);
-              lib-rbac = pkgs.writeText "lib-rbac.nix" (builtins.readFile ./src/lib/rbac.nix);
-               lib-cost-analysis = pkgs.writeText "lib-cost-analysis.nix" (builtins.readFile ./src/lib/cost-analysis.nix);
-               lib-kyverno = pkgs.writeText "lib-kyverno.nix" (builtins.readFile ./src/lib/kyverno.nix);
-               lib-gitops = pkgs.writeText "lib-gitops.nix" (builtins.readFile ./src/lib/gitops.nix);
-               lib-policy-visualization = pkgs.writeText "lib-policy-visualization.nix" (builtins.readFile ./src/lib/policy-visualization.nix);
-                lib-security-scanning = pkgs.writeText "lib-security-scanning.nix" (builtins.readFile ./src/lib/security-scanning.nix);
-                lib-performance-analysis = pkgs.writeText "lib-performance-analysis.nix" (builtins.readFile ./src/lib/performance-analysis.nix);
-                 lib-unified-api = pkgs.writeText "lib-unified-api.nix" (builtins.readFile ./src/lib/unified-api.nix);
-                   lib-policy-testing = pkgs.writeText "lib-policy-testing.nix" (builtins.readFile ./src/lib/policy-testing.nix);
-                   lib-helm-integration = pkgs.writeText "lib-helm-integration.nix" (builtins.readFile ./src/lib/helm-integration.nix);
-                   lib-advanced-orchestration = pkgs.writeText "lib-advanced-orchestration.nix" (builtins.readFile ./src/lib/advanced-orchestration.nix);
-                    lib-disaster-recovery = pkgs.writeText "lib-disaster-recovery.nix" (builtins.readFile ./src/lib/disaster-recovery.nix);
-                    lib-multi-tenancy = pkgs.writeText "lib-multi-tenancy.nix" (builtins.readFile ./src/lib/multi-tenancy.nix);
-                    lib-service-mesh = pkgs.writeText "lib-service-mesh.nix" (builtins.readFile ./src/lib/service-mesh.nix);
-                     lib-api-gateway = pkgs.writeText "lib-api-gateway.nix" (builtins.readFile ./src/lib/api-gateway.nix);
-                     lib-container-registry = pkgs.writeText "lib-container-registry.nix" (builtins.readFile ./src/lib/container-registry.nix);
-                     lib-secrets-management = pkgs.writeText "lib-secrets-management.nix" (builtins.readFile ./src/lib/secrets-management.nix);
-                     lib-ml-operations = pkgs.writeText "lib-ml-operations.nix" (builtins.readFile ./src/lib/ml-operations.nix);
-                     lib-batch-processing = pkgs.writeText "lib-batch-processing.nix" (builtins.readFile ./src/lib/batch-processing.nix);
-                     lib-database-management = pkgs.writeText "lib-database-management.nix" (builtins.readFile ./src/lib/database-management.nix);
-                     lib-event-processing = pkgs.writeText "lib-event-processing.nix" (builtins.readFile ./src/lib/event-processing.nix);
-                # Example package: Simple microservice deployment
-           example-app = pkgs.runCommand "example-app-manifests" {
+            packages = {
+              default = pkgs.runCommand "nixernetes" { }
+                ''
+                  mkdir -p $out
+                  echo "Nixernetes framework built successfully" > $out/version
+                  echo "Nixernetes: Enterprise Nix-driven Kubernetes Manifest Framework" > $out/description
+                '';
+
+              # Library modules (as documentation)
+              lib-schema = pkgs.writeText "lib-schema.nix" (builtins.readFile ./src/lib/schema.nix);
+              lib-compliance = pkgs.writeText "lib-compliance.nix" (builtins.readFile ./src/lib/compliance.nix);
+              lib-policies = pkgs.writeText "lib-policies.nix" (builtins.readFile ./src/lib/policies.nix);
+              lib-output = pkgs.writeText "lib-output.nix" (builtins.readFile ./src/lib/output.nix);
+              lib-types = pkgs.writeText "lib-types.nix" (builtins.readFile ./src/lib/types.nix);
+              lib-validation = pkgs.writeText "lib-validation.nix" (builtins.readFile ./src/lib/validation.nix);
+              lib-generators = pkgs.writeText "lib-generators.nix" (builtins.readFile ./src/lib/generators.nix);
+              lib-compliance-enforcement = pkgs.writeText "lib-compliance-enforcement.nix" (builtins.readFile ./src/lib/compliance-enforcement.nix);
+              lib-compliance-profiles = pkgs.writeText "lib-compliance-profiles.nix" (builtins.readFile ./src/lib/compliance-profiles.nix);
+               lib-policy-generation = pkgs.writeText "lib-policy-generation.nix" (builtins.readFile ./src/lib/policy-generation.nix);
+               lib-rbac = pkgs.writeText "lib-rbac.nix" (builtins.readFile ./src/lib/rbac.nix);
+                lib-cost-analysis = pkgs.writeText "lib-cost-analysis.nix" (builtins.readFile ./src/lib/cost-analysis.nix);
+                lib-kyverno = pkgs.writeText "lib-kyverno.nix" (builtins.readFile ./src/lib/kyverno.nix);
+                lib-gitops = pkgs.writeText "lib-gitops.nix" (builtins.readFile ./src/lib/gitops.nix);
+                lib-policy-visualization = pkgs.writeText "lib-policy-visualization.nix" (builtins.readFile ./src/lib/policy-visualization.nix);
+                 lib-security-scanning = pkgs.writeText "lib-security-scanning.nix" (builtins.readFile ./src/lib/security-scanning.nix);
+                 lib-performance-analysis = pkgs.writeText "lib-performance-analysis.nix" (builtins.readFile ./src/lib/performance-analysis.nix);
+                  lib-unified-api = pkgs.writeText "lib-unified-api.nix" (builtins.readFile ./src/lib/unified-api.nix);
+                    lib-policy-testing = pkgs.writeText "lib-policy-testing.nix" (builtins.readFile ./src/lib/policy-testing.nix);
+                    lib-helm-integration = pkgs.writeText "lib-helm-integration.nix" (builtins.readFile ./src/lib/helm-integration.nix);
+                    lib-advanced-orchestration = pkgs.writeText "lib-advanced-orchestration.nix" (builtins.readFile ./src/lib/advanced-orchestration.nix);
+                     lib-disaster-recovery = pkgs.writeText "lib-disaster-recovery.nix" (builtins.readFile ./src/lib/disaster-recovery.nix);
+                     lib-multi-tenancy = pkgs.writeText "lib-multi-tenancy.nix" (builtins.readFile ./src/lib/multi-tenancy.nix);
+                     lib-service-mesh = pkgs.writeText "lib-service-mesh.nix" (builtins.readFile ./src/lib/service-mesh.nix);
+                      lib-api-gateway = pkgs.writeText "lib-api-gateway.nix" (builtins.readFile ./src/lib/api-gateway.nix);
+                      lib-container-registry = pkgs.writeText "lib-container-registry.nix" (builtins.readFile ./src/lib/container-registry.nix);
+                      lib-secrets-management = pkgs.writeText "lib-secrets-management.nix" (builtins.readFile ./src/lib/secrets-management.nix);
+                      lib-ml-operations = pkgs.writeText "lib-ml-operations.nix" (builtins.readFile ./src/lib/ml-operations.nix);
+                      lib-batch-processing = pkgs.writeText "lib-batch-processing.nix" (builtins.readFile ./src/lib/batch-processing.nix);
+                      lib-database-management = pkgs.writeText "lib-database-management.nix" (builtins.readFile ./src/lib/database-management.nix);
+                      lib-event-processing = pkgs.writeText "lib-event-processing.nix" (builtins.readFile ./src/lib/event-processing.nix);
+                 # Example package: Simple microservice deployment
+            example-app = pkgs.runCommand "example-app-manifests" {
             buildInputs = with pkgs; [ yq ];
           } ''
             mkdir -p $out
@@ -164,11 +171,12 @@
             python3
             python3Packages.pyyaml
             python3Packages.jsonschema
+            python3Packages.pytest
           ];
 
           shellHook = ''
             echo "Nixernetes development shell loaded"
-            echo "Available tools: nix, yq, jq, python3"
+            echo "Available tools: nix, yq, jq, python3, pytest"
           '';
         };
 
