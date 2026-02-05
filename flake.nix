@@ -172,11 +172,16 @@
             python3Packages.pyyaml
             python3Packages.jsonschema
             python3Packages.pytest
+            python3Packages.pytest-cov
+            python3Packages.pylint
+            python3Packages.black
+            python3Packages.isort
+            python3Packages.detect-secrets
           ];
 
           shellHook = ''
             echo "Nixernetes development shell loaded"
-            echo "Available tools: nix, yq, jq, python3, pytest"
+            echo "Available tools: nix, yq, jq, python3, pytest, pylint, black, isort, detect-secrets"
           '';
         };
 

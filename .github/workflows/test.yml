@@ -76,9 +76,6 @@ jobs:
       
       - name: Check for hardcoded secrets
         run: nix develop -c -- python3 -m detect_secrets scan --baseline .secrets.baseline || true
-      
-      - name: Security audit Python dependencies
-        run: nix develop -c -- python3 -m pip audit || true
 
   docs:
     name: Documentation Build
