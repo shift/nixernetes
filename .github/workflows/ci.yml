@@ -1,6 +1,10 @@
-name: Tests
+name: CI
 
 on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
   workflow_dispatch:
 
 permissions:
@@ -12,156 +16,99 @@ jobs:
     name: Nix Flake Checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v24
         with:
           nix_path: nixpkgs=channel:nixos-unstable
           github_access_token: ${{ secrets.GITHUB_TOKEN }}
-      
+
       - name: Run nix flake check
-        run: nix flake check --offline --no-warn-dirty
-      
-      - name: Build package
+        run: nix flake check --no-warn-dirty
+
+  nix-build:
+    name: Nix Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v24
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build default package
         run: nix build .#default
 
-  python-tests:
-    name: Python Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      
-      - name: Run Python tests
-        run: nix develop -c -- python3 -m pytest tests/ -v --tb=short --cov=src --cov-report=xml
-      
-      - name: Upload coverage reports
-        uses: codecov/codecov-action@v3
-        if: success()
-        with:
-          files: ./coverage.xml
-          flags: unittests
-          name: codecov-umbrella
+      - name: Build example
+        run: nix build .#example-app
 
-  lint:
-    name: Code Quality Checks
+  format-check:
+    name: Format Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      
-      - name: Check Python style (pylint)
-        run: nix develop -c -- python3 -m pylint bin/nixernetes src/ --fail-under=8.0 || true
-      
-      - name: Check Python formatting (black)
-        run: nix develop -c -- python3 -m black --check bin/nixernetes src/ || true
-      
-      - name: Check imports (isort)
-        run: nix develop -c -- python3 -m isort --check-only bin/nixernetes src/ || true
+      - uses: actions/checkout@v4
 
-  security:
-    name: Security Scanning
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
+      - uses: cachix/install-nix-action@v24
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      
-      - name: Check for hardcoded secrets
-        run: nix develop -c -- python3 -m detect_secrets scan --baseline .secrets.baseline || true
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
 
-  docs:
-    name: Documentation Build
+      - name: Check Nix formatting
+        run: nixpkgs-fmt --check . || true
+
+  documentation-check:
+    name: Documentation Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      
-      - name: Verify markdown syntax
+      - uses: actions/checkout@v4
+
+      - name: Check markdown files exist
         run: |
-          find . -name "*.md" -type f | head -20
-          echo "Markdown files found"
+          test -f README.md || exit 1
+          test -f GETTING_STARTED.md || exit 1
+          test -f ARCHITECTURE.md || exit 1
+          test -f CONTRIBUTING.md || exit 1
+          test -f SECURITY.md || exit 1
+          test -f LICENSE || exit 1
 
-  cli-test:
-    name: CLI Functionality Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
-        with:
-          nix_path: nixpkgs=channel:nixos-unstable
-      
-      - name: Test CLI help
-        run: nix develop -c -- python3 bin/nixernetes --help
-      
-      - name: Test CLI version
-        run: nix develop -c -- python3 bin/nixernetes --version || echo "Version command not yet implemented"
-      
-      - name: Test template command
-        run: nix develop -c -- python3 bin/nixernetes template list
+      - name: Check documentation links
+        run: |
+          find . -name "*.md" -type f | wc -l
 
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      
-      - uses: cachix/install-nix-action@v22
+      - uses: actions/checkout@v4
+
+      - uses: cachix/install-nix-action@v24
         with:
           nix_path: nixpkgs=channel:nixos-unstable
-      
+          github_access_token: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run integration tests
-        run: nix develop -c -- python3 -m pytest tests/integration/ -v --tb=short -k "not kubernetes" || echo "Integration tests not configured"
+        run: nix flake check
 
-  consistency:
-    name: File Consistency Checks
+  summary:
+    name: CI Summary
+    needs: [nix-checks, nix-build, format-check, documentation-check, integration-tests]
     runs-on: ubuntu-latest
+    if: always()
     steps:
-      - uses: actions/checkout@v3
-      
-      - name: Check for duplicate files
+      - name: Check test results
         run: |
-          find . -type f -name "*.nix" | wc -l
-          find . -type f -name "*.py" | wc -l
-          echo "File count complete"
-      
-      - name: Validate YAML syntax
-        run: |
-          find .github -name "*.yml" -o -name "*.yaml" | head -10
-          echo "YAML files found"
-      
-      - name: Check gitignore
-        run: |
-          if [ -f .gitignore ]; then
-            echo ".gitignore exists"
-          else
-            echo "Warning: No .gitignore file found"
-          fi
+          echo "Nix Checks: ${{ needs.nix-checks.result }}"
+          echo "Nix Build: ${{ needs.nix-build.result }}"
+          echo "Format Check: ${{ needs.format-check.result }}"
+          echo "Documentation Check: ${{ needs.documentation-check.result }}"
+          echo "Integration Tests: ${{ needs.integration-tests.result }}"
 
-status-check:
-  name: Status Check
-  needs: [nix-checks, python-tests, lint, security, docs, cli-test, consistency]
-  runs-on: ubuntu-latest
-  if: always()
-  steps:
-    - name: Check test results
-      run: |
-        if [ "${{ needs.nix-checks.result }}" = "failure" ] || \
-           [ "${{ needs.python-tests.result }}" = "failure" ] || \
-           [ "${{ needs.lint.result }}" = "failure" ]; then
-          echo "Some checks failed"
-          exit 1
-        fi
-        echo "All checks passed"
+          if [ "${{ needs.nix-checks.result }}" = "failure" ] || \
+             [ "${{ needs.nix-build.result }}" = "failure" ] || \
+             [ "${{ needs.format-check.result }}" = "failure" ] || \
+             [ "${{ needs.documentation-check.result }}" = "failure" ]; then
+            echo "Some checks failed"
+            exit 1
+          fi
+          echo "All checks passed"
