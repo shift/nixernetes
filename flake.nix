@@ -7,48 +7,53 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem (system:
+    let
+      # Define a function to create the nixernetes lib in a system-independent way
+      mkNixernetesLib = { lib, pkgs }:
+        {
+          schema = import ./src/lib/schema.nix { inherit lib; };
+          compliance = import ./src/lib/compliance.nix { inherit lib; };
+          complianceEnforcement = import ./src/lib/compliance-enforcement.nix { inherit lib; };
+          complianceProfiles = import ./src/lib/compliance-profiles.nix { inherit lib; };
+          policies = import ./src/lib/policies.nix { inherit lib; };
+          policyGeneration = import ./src/lib/policy-generation.nix { inherit lib; };
+          rbac = import ./src/lib/rbac.nix { inherit lib; };
+          api = import ./src/lib/api.nix { inherit lib pkgs; };
+          manifest = import ./src/lib/manifest.nix { inherit lib pkgs; };
+          externalSecrets = import ./src/lib/external-secrets.nix { inherit lib; };
+          costAnalysis = import ./src/lib/cost-analysis.nix { inherit lib; };
+          kyverno = import ./src/lib/kyverno.nix { inherit lib; };
+          gitops = import ./src/lib/gitops.nix { inherit lib; };
+          policyVisualization = import ./src/lib/policy-visualization.nix { inherit lib; };
+          securityScanning = import ./src/lib/security-scanning.nix { inherit lib; };
+          performanceAnalysis = import ./src/lib/performance-analysis.nix { inherit lib; };
+          unifiedApi = import ./src/lib/unified-api.nix { inherit lib; };
+          policyTesting = import ./src/lib/policy-testing.nix { inherit lib; };
+          helmIntegration = import ./src/lib/helm-integration.nix { inherit lib; };
+          advancedOrchestration = import ./src/lib/advanced-orchestration.nix { inherit lib; };
+          disasterRecovery = import ./src/lib/disaster-recovery.nix { inherit lib; };
+          multiTenancy = import ./src/lib/multi-tenancy.nix { inherit lib; };
+          serviceMesh = import ./src/lib/service-mesh.nix { inherit lib; };
+          apiGateway = import ./src/lib/api-gateway.nix { inherit lib; };
+          containerRegistry = import ./src/lib/container-registry.nix { inherit lib; };
+          secretsManagement = import ./src/lib/secrets-management.nix { inherit lib; };
+          mlOperations = import ./src/lib/ml-operations.nix { inherit lib; };
+          batchProcessing = import ./src/lib/batch-processing.nix { inherit lib; };
+          databaseManagement = import ./src/lib/database-management.nix { inherit lib; };
+          eventProcessing = import ./src/lib/event-processing.nix { inherit lib; };
+          output = import ./src/lib/output.nix { inherit lib pkgs; };
+          types = import ./src/lib/types.nix { inherit lib; };
+          validation = import ./src/lib/validation.nix { inherit lib; };
+          generators = import ./src/lib/generators.nix { inherit lib pkgs; };
+        };
+    in
+    (flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
         lib = pkgs.lib;
 
-         # Import our custom library modules
-          nixernetes = {
-            schema = import ./src/lib/schema.nix { inherit lib; };
-            compliance = import ./src/lib/compliance.nix { inherit lib; };
-            complianceEnforcement = import ./src/lib/compliance-enforcement.nix { inherit lib; };
-            complianceProfiles = import ./src/lib/compliance-profiles.nix { inherit lib; };
-            policies = import ./src/lib/policies.nix { inherit lib; };
-            policyGeneration = import ./src/lib/policy-generation.nix { inherit lib; };
-            rbac = import ./src/lib/rbac.nix { inherit lib; };
-            api = import ./src/lib/api.nix { inherit lib pkgs; };
-            manifest = import ./src/lib/manifest.nix { inherit lib pkgs; };
-            externalSecrets = import ./src/lib/external-secrets.nix { inherit lib; };
-            costAnalysis = import ./src/lib/cost-analysis.nix { inherit lib; };
-            kyverno = import ./src/lib/kyverno.nix { inherit lib; };
-            gitops = import ./src/lib/gitops.nix { inherit lib; };
-            policyVisualization = import ./src/lib/policy-visualization.nix { inherit lib; };
-            securityScanning = import ./src/lib/security-scanning.nix { inherit lib; };
-            performanceAnalysis = import ./src/lib/performance-analysis.nix { inherit lib; };
-             unifiedApi = import ./src/lib/unified-api.nix { inherit lib; };
-               policyTesting = import ./src/lib/policy-testing.nix { inherit lib; };
-               helmIntegration = import ./src/lib/helm-integration.nix { inherit lib; };
-               advancedOrchestration = import ./src/lib/advanced-orchestration.nix { inherit lib; };
-                disasterRecovery = import ./src/lib/disaster-recovery.nix { inherit lib; };
-                multiTenancy = import ./src/lib/multi-tenancy.nix { inherit lib; };
-                serviceMesh = import ./src/lib/service-mesh.nix { inherit lib; };
-                apiGateway = import ./src/lib/api-gateway.nix { inherit lib; };
-                 containerRegistry = import ./src/lib/container-registry.nix { inherit lib; };
-                 secretsManagement = import ./src/lib/secrets-management.nix { inherit lib; };
-                 mlOperations = import ./src/lib/ml-operations.nix { inherit lib; };
-                 batchProcessing = import ./src/lib/batch-processing.nix { inherit lib; };
-                 databaseManagement = import ./src/lib/database-management.nix { inherit lib; };
-                 eventProcessing = import ./src/lib/event-processing.nix { inherit lib; };
-                 output = import ./src/lib/output.nix { inherit lib pkgs; };
-             types = import ./src/lib/types.nix { inherit lib; };
-             validation = import ./src/lib/validation.nix { inherit lib; };
-             generators = import ./src/lib/generators.nix { inherit lib pkgs; };
-           };
+        # Import our custom library modules
+        nixernetes = mkNixernetesLib { inherit lib pkgs; };
 
         # Test runner for module validation
         runTests = pkgs.writeShellScript "nixernetes-tests" ''
@@ -668,5 +673,13 @@
         # Formatter
         formatter = pkgs.nixpkgs-fmt;
       }
-    );
+    )) // {
+      # Top-level lib output for flake-based consumption
+      # This allows external flakes to use: nixernetes.lib.mkDeployment, etc.
+      # Note: Some functions (manifest, generators, output) may require pkgs from the consumer's flake
+      lib = mkNixernetesLib {
+        lib = nixpkgs.lib;
+        pkgs = nixpkgs.legacyPackages.x86_64-linux;
+      };
+    };
 }
